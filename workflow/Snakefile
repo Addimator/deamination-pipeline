@@ -6,11 +6,11 @@ genome_config = config["sample"]
 
 rule all:
     input:
-        "resources/example/pos_to_bases.txt",
+        "resources/pos_to_bases.txt",
 
 rule get_genome:
     output:
-        "resources/example/genome.fasta",
+        "resources/genome.fasta",
     params:
         species=genome_config["species"],
         datatype=genome_config["datatype"],
@@ -24,9 +24,9 @@ rule get_genome:
 
 rule genome_index:
     input:
-        "resources/example/genome.fasta",
+        "resources/genome.fasta",
     output:
-        "resources/example/genome.fasta.fai",
+        "resources/genome.fasta.fai",
     log:
         "logs/genome_index.log",
     conda:
@@ -41,9 +41,9 @@ rule genome_index:
 
 rule find_candidates:
     input:
-        "resources/example/genome.fasta",
+        "resources/genome.fasta",
     output:
-        "resources/example/candidates.bcf",
+        "resources/candidates.bcf",
     log:
         "logs/find_candidates.log",
     conda:
@@ -59,9 +59,9 @@ rule find_candidates:
 
 rule candidates_to_vcf:
     input:
-        "resources/example/candidates.bcf",
+        "resources/candidates.bcf",
     output:
-        "resources/example/candidates.vcf",
+        "resources/candidates.vcf",
     conda:
         "envs/samtools.yaml"
     log:
@@ -74,8 +74,8 @@ rule candidates_to_vcf:
 rule get_fastq_pe:
     output:
         # the wildcard name must be accession, pointing to an SRA number
-        "resources/example/{accession}_1.fastq",
-        "resources/example/{accession}_2.fastq",
+        "resources/{accession}_1.fastq",
+        "resources/{accession}_2.fastq",
     log:
         "logs/pe/{accession}.log"
     params:
@@ -89,11 +89,11 @@ rule get_fastq_pe:
 
 rule align_reads:
     input:
-        fasta="resources/example/genome.fasta",
-        reads1=expand("resources/example/{accession}_1.fastq", accession=accession),
-        reads2=expand("resources/example/{accession}_2.fastq", accession=accession),
+        fasta="resources/genome.fasta",
+        reads1=expand("resources/{accession}_1.fastq", accession=accession),
+        reads2=expand("resources/{accession}_2.fastq", accession=accession),
     output:
-        "resources/example/aligned-reads.sam",
+        "resources/aligned-reads.sam",
     conda:
         "envs/bwa-mem2.yaml"
     log:
@@ -106,10 +106,10 @@ rule align_reads:
 
 rule find_bases:
     input:
-        candidates="resources/example/candidates.vcf",
-        aligned_reads="resources/example/aligned-reads.sam",
+        aligned_reads="resources/aligned-reads.sam",
+        candidates="resources/candidates.vcf",
     output:
-        "resources/example/pos_to_bases.txt",
+        "resources/pos_to_bases.txt",
     conda:
         "envs/varlociraptor.yaml"
     params:
@@ -120,4 +120,5 @@ rule find_bases:
         """
         cd {params.pipeline_path}workflow/scripts
         rustc find-bases.rs
+        ./find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.candidates} {params.pipeline_path}{output}
         """

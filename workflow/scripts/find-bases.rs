@@ -75,7 +75,7 @@ fn count_bases_in_reads(sam_file_path: &str, vcf_positions: &HashSet<u32>) -> io
 fn main() -> io::Result<()> {
     // Erhalte die Befehlszeilenargumente als Iterator
     let args: Vec<String> = env::args().collect();
-
+    println!("Test");
     // Überprüfe, ob genügend Argumente übergeben wurden
     if args.len() < 4 {
         eprintln!("Usage: {} <sam_file_path> <vcf_file_path> <output_file_path>", args[0]);
