@@ -1,0 +1,123 @@
+configfile: "config/config.yaml"
+
+accession = config["accession"]
+genome_config = config["sample"]
+
+
+rule all:
+    input:
+        "resources/example/pos_to_bases.txt",
+
+rule get_genome:
+    output:
+        "resources/example/genome.fasta",
+    params:
+        species=genome_config["species"],
+        datatype=genome_config["datatype"],
+        build=genome_config["build"],
+        release=genome_config["release"],
+    log:
+        "logs/get_genome.log",
+    cache: "omit-software"  # save space and time with between workflow caching (see docs)
+    wrapper:
+        "v2.3.2/bio/reference/ensembl-sequence"
+
+rule genome_index:
+    input:
+        "resources/example/genome.fasta",
+    output:
+        "resources/example/genome.fasta.fai",
+    log:
+        "logs/genome_index.log",
+    conda:
+        "envs/samtools.yaml"
+    params:
+        pipeline_path=config["pipeline_path"],
+    shell:
+        """ 
+        samtools faidx {params.pipeline_path}{input}
+        """
+
+
+rule find_candidates:
+    input:
+        "resources/example/genome.fasta",
+    output:
+        "resources/example/candidates.bcf",
+    log:
+        "logs/find_candidates.log",
+    conda:
+        "envs/varlociraptor.yaml"
+    params:
+        varlo_path=config["varlo_path"],
+        pipeline_path=config["pipeline_path"],
+    shell:
+        """ 
+        cd {params.varlo_path}
+        cargo run -- methylation-candidates {params.pipeline_path}{input} {params.pipeline_path}{output}
+        """
+
+rule candidates_to_vcf:
+    input:
+        "resources/example/candidates.bcf",
+    output:
+        "resources/example/candidates.vcf",
+    conda:
+        "envs/samtools.yaml"
+    log:
+        "logs/convert_to_vcf.log",
+    shell:
+        """
+        bcftools view {input} > {output}
+        """
+
+rule get_fastq_pe:
+    output:
+        # the wildcard name must be accession, pointing to an SRA number
+        "resources/example/{accession}_1.fastq",
+        "resources/example/{accession}_2.fastq",
+    log:
+        "logs/pe/{accession}.log"
+    params:
+        extra="--skip-technical"
+    threads: 6  # defaults to 6
+    conda:
+        "envs/fastq-wrapper.yaml"
+    wrapper:
+        "v2.6.0/bio/sra-tools/fasterq-dump"
+
+
+rule align_reads:
+    input:
+        fasta="resources/example/genome.fasta",
+        reads1=expand("resources/example/{accession}_1.fastq", accession=accession),
+        reads2=expand("resources/example/{accession}_2.fastq", accession=accession),
+    output:
+        "resources/example/aligned-reads.sam",
+    conda:
+        "envs/bwa-mem2.yaml"
+    log:
+        "logs/align_reads.log",
+    shell:
+        """
+        bwa-mem2 index {input.fasta}
+        bwa-mem2 {input.fasta} {input.reads1} {input.reads2} | gzip -3 > aln-pe.sam.gz
+        """
+
+rule find_bases:
+    input:
+        candidates="resources/example/candidates.vcf",
+        aligned_reads="resources/example/aligned-reads.sam",
+    output:
+        "resources/example/pos_to_bases.txt",
+    conda:
+        "envs/varlociraptor.yaml"
+    params:
+        pipeline_path=config["pipeline_path"],
+    log:
+        "logs/find_bases.log",
+    shell:
+        """
+        cd {params.pipeline_path}workflow/scripts
+        rustc find-bases.rs
+        """

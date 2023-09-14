@@ -1,0 +1,20 @@
+sample:
+  species: "homo_sapiens"
+  datatype: "dna"
+  build: "GRCh38"
+  release: "110"
+  chromosome: "1"
+
+
+varlo_path: "~/Documents/Promotion/varlociraptor/"
+pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
+methylFastQ_path: "~/Documents/Promotion/MethylFASTQ/"
+
+# varlo_path: "/projects/koesterlab/benchmark-methylation/varlociraptor/"
+# pipeline_path: "/projects/koesterlab/benchmark-methylation/varlociraptor-methylation-evaluation/"
+# methylFastQ_path: "/projects/koesterlab/benchmark-methylation/MethylFASTQ/"
+
+read_type: "Illumina"
+accession: "SRR13051250"
+
+accession: "SRR1766444"
