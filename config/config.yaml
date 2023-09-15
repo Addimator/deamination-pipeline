@@ -6,11 +6,11 @@ sample:
   chromosome: "1"
 
 
-varlo_path: "~/Documents/Promotion/varlociraptor/"
+varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
 pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
 methylFastQ_path: "~/Documents/Promotion/MethylFASTQ/"
 
-# varlo_path: "/projects/koesterlab/benchmark-methylation/varlociraptor/"
+# varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
 # pipeline_path: "/projects/koesterlab/benchmark-methylation/varlociraptor-methylation-evaluation/"
 # methylFastQ_path: "/projects/koesterlab/benchmark-methylation/MethylFASTQ/"
 
