@@ -8,11 +8,13 @@ sample:
 
 varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
 pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
-methylFastQ_path: "~/Documents/Promotion/MethylFASTQ/"
 
 # varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
-# pipeline_path: "/projects/koesterlab/benchmark-methylation/varlociraptor-methylation-evaluation/"
-# methylFastQ_path: "/projects/koesterlab/benchmark-methylation/MethylFASTQ/"
+# pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
+
+# varlo_path: "/local/work/aprinz/deamination-varlo/varlociraptor/"
+# pipeline_path: "/local/work/aprinz/deamination-pipeline/"
+
 
 read_type: "Illumina"
 accession: "SRR13051250"
