@@ -101,7 +101,7 @@ rule align_reads:
     shell:
         """
         bwa-mem2 index {input.fasta}
-        bwa-mem2 {input.fasta} {input.reads1} {input.reads2} | gzip -3 > aln-pe.sam.gz
+        bwa-mem2 mem -t 8 {input.fasta} {input.reads1} {input.reads2} | gzip -3 > {output}
         """
 
 rule find_bases:

@@ -128,7 +128,7 @@ fn main() -> Result<()> {
                 let bases_fields_reverse: Vec<&str> = bases_line_reverse.split('\t').collect();
 
                 // Update the appropriate HashMaps based on methylation status and direction
-                if methylation > 0 {
+                if methylation > 0.2 {
                     update_base_counts(&mut meth_pos_forward, chrom.clone(), bases_fields_forward);
                     update_base_counts(&mut meth_pos_reverse, chrom.clone(), bases_fields_reverse);
                 } else {
