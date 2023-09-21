@@ -1,0 +1,1 @@
+/home/adrian/Documents/Promotion/deamination-pipeline/workflow/scripts/target/debug/scripts: /home/adrian/Documents/Promotion/deamination-pipeline/workflow/scripts/src/assign_bases.rs /home/adrian/Documents/Promotion/deamination-pipeline/workflow/scripts/src/find_bases.rs /home/adrian/Documents/Promotion/deamination-pipeline/workflow/scripts/src/main.rs

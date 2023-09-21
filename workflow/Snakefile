@@ -6,7 +6,7 @@ genome_config = config["sample"]
 
 rule all:
     input:
-        "resources/example/pos_to_bases.txt",
+        "results/example/assigned_bases.txt"
 
 rule get_genome:
     output:
@@ -119,6 +119,23 @@ rule find_bases:
     shell:
         """
         cd {params.pipeline_path}workflow/scripts
-        rustc find-bases.rs
-        ./find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.candidates} {params.pipeline_path}{output}
+        cargo run  -- find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.candidates} {params.pipeline_path}{output}
+       """
+
+rule assign_bases:
+    input:
+        bedGraph="resources/example/alignments_CpG.bedGraph",
+        ref_bases="resources/example/pos_to_bases.txt",
+    output:
+        "results/example/assigned_bases.txt"
+    conda:
+        "envs/varlociraptor.yaml"
+    params:
+        pipeline_path=config["pipeline_path"],
+    log:
+        "logs/assign_bases.log",
+    shell:
+        """
+        cd {params.pipeline_path}workflow/scripts
+        cargo run  -- assign-bases {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{input.ref_bases} {params.pipeline_path}{output}
         """
