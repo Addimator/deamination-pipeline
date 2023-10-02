@@ -17,9 +17,9 @@ pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
 
 
 read_type: "Illumina"
-# accession: "SRR13051250"
 
-accession: "SRR1766443"
+# Nicht bisulfitbehandelte Referenzdaten: SRR1766444 (1.18 GB)
+accession: "SRR1766444"
 
 
 bedGraphs_HG002:

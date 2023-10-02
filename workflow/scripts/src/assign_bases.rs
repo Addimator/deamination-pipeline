@@ -5,7 +5,7 @@ use std::collections::HashMap;
 pub fn update_base_counts(
     target_map: &mut HashMap<String, HashMap<char, usize>>,
     chrom: String,
-    bases_fields: Vec<&str>,
+    bases_fields: Vec<String>,
 ) {
     let bases_chars = vec!['A', 'C', 'G', 'T', 'N'];
     let bases_entries = target_map

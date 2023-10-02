@@ -39,8 +39,7 @@ pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<u32>
 
     // Process the SAM file line by line
     for line in sam_reader.lines() {
-        let line = line?;
-        println!("{}", line);
+        let line = line.unwrap();
 
         // Skip header lines
         if line.starts_with('@') {

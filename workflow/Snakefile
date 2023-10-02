@@ -8,9 +8,10 @@ rule all:
     input:
         "results/assigned_bases.txt"
 
+
 rule get_genome:
     output:
-        "resources/genome.fasta",
+        "resources/example/genome.fasta",
     params:
         species=genome_config["species"],
         datatype=genome_config["datatype"],
@@ -24,9 +25,9 @@ rule get_genome:
 
 rule genome_index:
     input:
-        "resources/genome.fasta",
+        "resources/example/genome.fasta",
     output:
-        "resources/genome.fasta.fai",
+        "resources/example/genome.fasta.fai",
     log:
         "logs/genome_index.log",
     conda:
@@ -41,9 +42,9 @@ rule genome_index:
 
 rule find_candidates:
     input:
-        "resources/genome.fasta",
+        "resources/example/genome.fasta",
     output:
-        "resources/candidates.bcf",
+        "resources/example/candidates.bcf",
     log:
         "logs/find_candidates.log",
     conda:
@@ -59,9 +60,9 @@ rule find_candidates:
 
 rule candidates_to_vcf:
     input:
-        "resources/candidates.bcf",
+        "resources/example/candidates.bcf",
     output:
-        "resources/candidates.vcf",
+        "resources/example/candidates.vcf",
     conda:
         "envs/samtools.yaml"
     log:
@@ -74,8 +75,8 @@ rule candidates_to_vcf:
 rule get_fastq_pe:
     output:
         # the wildcard name must be accession, pointing to an SRA number
-        "resources/{accession}_1.fastq",
-        "resources/{accession}_2.fastq",
+        "resources/example/{accession}_1.fastq",
+        "resources/example/{accession}_2.fastq",
     log:
         "logs/pe/{accession}.log"
     params:
@@ -89,11 +90,11 @@ rule get_fastq_pe:
 
 rule align_reads:
     input:
-        fasta="resources/genome.fasta",
-        reads1=expand("resources/{accession}_1.fastq", accession=accession),
-        reads2=expand("resources/{accession}_2.fastq", accession=accession),
+        fasta="resources/example/genome.fasta",
+        reads1=expand("resources/example/{accession}_1.fastq", accession=accession),
+        reads2=expand("resources/example/{accession}_2.fastq", accession=accession),
     output:
-        "resources/aligned-reads.sam",
+        "resources/example/aligned-reads.bam",
     conda:
         "envs/bwa-mem2.yaml"
     log:
@@ -101,15 +102,15 @@ rule align_reads:
     shell:
         """
         bwa-mem2 index {input.fasta}
-        bwa-mem2 mem -t 8 {input.fasta} {input.reads1} {input.reads2} | gzip -3 > {output}
+        bwa-mem2 mem -t 8 {input.fasta} {input.reads1} {input.reads2} | samtools view -S -b - > {output}
         """
 
 rule find_bases:
     input:
-        aligned_reads="resources/aligned-reads.sam",
-        candidates="resources/candidates.vcf",
+        aligned_reads="resources/example/aligned-reads.sam",
+        candidates="resources/example/candidates.vcf",
     output:
-        "resources/pos_to_bases.txt",
+        "resources/example/pos_to_bases.txt",
     conda:
         "envs/varlociraptor.yaml"
     params:
@@ -124,7 +125,7 @@ rule find_bases:
 
 rule download_bedGraphs:
     output:
-        "resources/HG002/{bedGraph}.bedGraph.gz",
+        "resources/example/HG002/{bedGraph}.bedGraph.gz",
     log:
         "logs/download_bedGraphs{bedGraph}.log",
     params:
@@ -136,9 +137,9 @@ rule download_bedGraphs:
 
 rule process_data:
     input:
-        "resources/HG002/{bedGraph}.bedGraph.gz"
+        "resources/example/HG002/{bedGraph}.bedGraph.gz"
     output:
-        "resources/HG002/{bedGraph}.bedGraph"
+        "resources/example/HG002/{bedGraph}.bedGraph"
     log:
         "logs/process_data{bedGraph}.log",
     shell:
@@ -147,11 +148,11 @@ rule process_data:
 
 rule compute_avg_bedGraph:
     input:
-        # expand("resources/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
-        expand("resources/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"])
+        # expand("resources/example/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
+        expand("resources/example/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"])
 
     output:
-        "resources/bed_avg.bedGraph",
+        "resources/example/bed_avg.bedGraph",
     log:
         "logs/compute_avg_bedGraph.log",
     script:
@@ -161,8 +162,8 @@ rule compute_avg_bedGraph:
 
 rule assign_bases:
     input:
-        bedGraph="resources/bed_avg.bedGraph",
-        ref_bases="resources/pos_to_bases.txt",
+        bedGraph="resources/example/bed_avg.bedGraph",
+        ref_bases="resources/example/pos_to_bases.txt",
     output:
         "results/assigned_bases.txt"
     conda:

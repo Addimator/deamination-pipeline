@@ -31,9 +31,9 @@ pub enum Deamination {
             name = "candidates",
             parse(from_os_str),
             required = true,
-            help = "Candidates of CpG positions in VCF format"
+            help = "Candidates of CpG positions in BCF format"
         )]
-        vcf_file_path: PathBuf,
+        bcf_file_path: PathBuf,
         #[structopt(
             name = "output", 
             parse(from_os_str), 
@@ -74,9 +74,9 @@ pub enum Deamination {
 fn main() -> Result<()> {
     let opt = Deamination::from_args();
     match opt {
-        Deamination::BaseFinder { sam_file_path, vcf_file_path, output } => {
+        Deamination::BaseFinder { sam_file_path, bcf_file_path, output } => {
 
-            let vcf_positions = extract_vcf_positions(vcf_file_path)?;
+            let vcf_positions = extract_vcf_positions(bcf_file_path)?;
             let position_counts = count_bases_in_reads(sam_file_path, &vcf_positions)?;
 
             // Öffnen Sie die Ausgabedatei zum Schreiben
@@ -84,7 +84,7 @@ fn main() -> Result<()> {
             let mut writer = BufWriter::new(output_file);
 
             // Schreiben Sie die Ergebnisse in die Datei
-            writeln!(&mut writer, "#CHROM	#DIR	#POS	#A	#C	#G	#T	#N")?;
+            writeln!(&mut writer, "#CHROM	#POS	#DIR	#A	#C	#G	#T	#N")?;
             for ((reference_name, position, direction), counts) in &position_counts {
                 write!(
                     &mut writer,
@@ -106,8 +106,36 @@ fn main() -> Result<()> {
             let bases_file = File::open(bases_file_path).expect("Unable to open bases file");
 
             let bedgraph_reader = BufReader::new(bedgraph_file);
-            let mut bases_reader = BufReader::new(bases_file).lines();
-            bases_reader.next().expect("Error reading header line").unwrap();
+            let bases_reader = BufReader::new(bases_file);
+      
+
+
+
+
+            let mut forward_baseline_map: HashMap<(String, usize), Vec<String>> = HashMap::new();
+            let mut reverse_baseline_map: HashMap<(String, usize), Vec<String>> = HashMap::new();
+            
+
+
+
+            for base_line in bases_reader.lines() {
+                let base_line = base_line.expect("Error reading bedGraph line");
+                if base_line.starts_with("#") {
+                    continue;
+                }
+                let base_fields: Vec<String>  = base_line.split('\t').map(|s| s.to_string()).collect();
+
+                let chrom = base_fields[0].to_string();
+                let position = base_fields[1].parse::<usize>().expect("Invalid position value");
+                let direction = base_fields[2].parse::<char>().expect("Invalid direction");
+            
+                if direction == 'f'{
+                    forward_baseline_map.insert((chrom.clone(), position), base_fields.clone());
+                }
+                else {
+                    reverse_baseline_map.insert((chrom.clone(), position), base_fields.clone());
+                }
+            }
 
             for bed_line in bedgraph_reader.lines() {
                 let bed_line = bed_line.expect("Error reading bedGraph line");
@@ -115,28 +143,36 @@ fn main() -> Result<()> {
                     continue;
                 }
                 let bed_fields: Vec<&str> = bed_line.split('\t').collect();
-
-                // Extract relevant information from bedgraph
+            
+                // Extrahiere relevante Informationen aus dem Bedgraph
                 let chrom = bed_fields[0].to_string();
-                let methylation = bed_fields[3].parse::<usize>().expect("Invalid methylation value");
+                let position = (bed_fields[1].parse::<usize>().expect("Invalid position value") + bed_fields[1].parse::<usize>().expect("Invalid position value")) / 2;
+                let methylation = bed_fields[3].parse::<f64>().expect("Invalid methylation value");
+                
+                let chrom_clone1 = chrom.clone();
+                let chrom_clone2 = chrom.clone();
+                let chrom_clone3 = chrom.clone();
+                let chrom_clone4 = chrom.clone();
+                let chrom_clone5 = chrom.clone();
+                let chrom_clone6 = chrom.clone();
+                let chrom_clone7 = chrom.clone();
+                if forward_baseline_map.contains_key(&(chrom, position)) {
+                    let bases_fields_forward = &forward_baseline_map[&(chrom_clone1, position)];
+                    let bases_fields_reverse = &reverse_baseline_map[&(chrom_clone2, position)];
 
-                // Get the two lines from bases.txt for the current position
-                let bases_line_forward = bases_reader.next().expect("Error reading bases forward line").unwrap();
-                let bases_line_reverse = bases_reader.next().expect("Error reading bases reverse line").unwrap();
-
-                let bases_fields_forward: Vec<&str> = bases_line_forward.split('\t').collect();
-                let bases_fields_reverse: Vec<&str> = bases_line_reverse.split('\t').collect();
-
-                // Update the appropriate HashMaps based on methylation status and direction
-                if methylation > 0.2 {
-                    update_base_counts(&mut meth_pos_forward, chrom.clone(), bases_fields_forward);
-                    update_base_counts(&mut meth_pos_reverse, chrom.clone(), bases_fields_reverse);
-                } else {
-                    update_base_counts(&mut unmeth_pos_forward, chrom.clone(), bases_fields_forward);
-                    update_base_counts(&mut unmeth_pos_reverse, chrom.clone(), bases_fields_reverse);
+                    if methylation > 20.0 {
+                        update_base_counts(&mut meth_pos_forward, chrom_clone3, bases_fields_forward.to_vec());
+                        update_base_counts(&mut meth_pos_reverse, chrom_clone4, bases_fields_reverse.to_vec());
+                    } else {
+                        update_base_counts(&mut unmeth_pos_forward, chrom_clone5, bases_fields_forward.to_vec());
+                        update_base_counts(&mut unmeth_pos_reverse, chrom_clone6, bases_fields_reverse.to_vec());
+                    }
                 }
-            }
+                else {
+                    println!("Entry not found: ({}, {})", chrom_clone7, position)
+                }
 
+            }
 
             let output: Option<File> = match output {
                 Some(path) => {
