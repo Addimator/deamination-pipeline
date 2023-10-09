@@ -46,7 +46,7 @@
                 "assign-bases",
                 "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/alignments_CpG.bedGraph",
                 "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/pos_to_bases.txt",
-                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/assigned_bases.txt"
+                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/assigned_bases.txt"
             ],
             "cwd": "${workspaceFolder}" 
         },

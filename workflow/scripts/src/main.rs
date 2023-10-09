@@ -146,9 +146,11 @@ fn main() -> Result<()> {
             
                 // Extrahiere relevante Informationen aus dem Bedgraph
                 let chrom = bed_fields[0].to_string();
-                let position = (bed_fields[1].parse::<usize>().expect("Invalid position value") + bed_fields[1].parse::<usize>().expect("Invalid position value")) / 2;
+                let position = (bed_fields[1].parse::<usize>().expect("Invalid position value") + bed_fields[2].parse::<usize>().expect("Invalid position value")) / 2;
                 let methylation = bed_fields[3].parse::<f64>().expect("Invalid methylation value");
                 
+                let chrom_clone0 = chrom.clone();
+
                 let chrom_clone1 = chrom.clone();
                 let chrom_clone2 = chrom.clone();
                 let chrom_clone3 = chrom.clone();
@@ -156,15 +158,19 @@ fn main() -> Result<()> {
                 let chrom_clone5 = chrom.clone();
                 let chrom_clone6 = chrom.clone();
                 let chrom_clone7 = chrom.clone();
-                if forward_baseline_map.contains_key(&(chrom, position)) {
+                if forward_baseline_map.contains_key(&(chrom_clone0, position)) {
                     let bases_fields_forward = &forward_baseline_map[&(chrom_clone1, position)];
-                    let bases_fields_reverse = &reverse_baseline_map[&(chrom_clone2, position)];
-
                     if methylation > 20.0 {
                         update_base_counts(&mut meth_pos_forward, chrom_clone3, bases_fields_forward.to_vec());
-                        update_base_counts(&mut meth_pos_reverse, chrom_clone4, bases_fields_reverse.to_vec());
                     } else {
                         update_base_counts(&mut unmeth_pos_forward, chrom_clone5, bases_fields_forward.to_vec());
+                    }
+                }
+                if reverse_baseline_map.contains_key(&(chrom, position)) {
+                    let bases_fields_reverse = &reverse_baseline_map[&(chrom_clone2, position)];
+                    if methylation > 20.0 {
+                        update_base_counts(&mut meth_pos_reverse, chrom_clone4, bases_fields_reverse.to_vec());
+                    } else {
                         update_base_counts(&mut unmeth_pos_reverse, chrom_clone6, bases_fields_reverse.to_vec());
                     }
                 }
