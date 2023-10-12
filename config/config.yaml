@@ -3,17 +3,14 @@ sample:
   datatype: "dna"
   build: "GRCh38"
   release: "110"
-  chromosome: "1"
+  chromosome: "21"
 
 
-varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
-pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
+# varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
+# pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
 
-# varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
-# pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
-
-# varlo_path: "/local/work/aprinz/deamination-varlo/varlociraptor/"
-# pipeline_path: "/local/work/aprinz/deamination-pipeline/"
+varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
+pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
 
 
 read_type: "Illumina"

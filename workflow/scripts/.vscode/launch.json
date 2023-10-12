@@ -21,9 +21,9 @@
             },
             "args": [
                 "find-bases",
-                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/aligned-reads.sam",
-                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/candidates.vcf",
-                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/pos_to_bases.txt"
+                "/projects/koesterlab/benchmark-methylation/deamination-pipeline/resources/example/aligned-reads.sam",
+                "/projects/koesterlab/benchmark-methylation/deamination-pipeline/resources/example/candidates.vcf",
+                "/projects/koesterlab/benchmark-methylation/deamination-pipeline/resources/example/pos_to_bases.txt"
             ],
             "cwd": "${workspaceFolder}" 
         },
@@ -44,9 +44,9 @@
             },
             "args": [
                 "assign-bases",
-                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/alignments_CpG.bedGraph",
-                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/example/pos_to_bases.txt",
-                "/home/adrian/Documents/Promotion/deamination-pipeline/resources/assigned_bases.txt"
+                "/projects/koesterlab/benchmark-methylation/deamination-pipeline/resources/bed_avg.bedGraph",
+                "/projects/koesterlab/benchmark-methylation/deamination-pipeline/resources/pos_to_bases_1-of-20.txt",
+                "/projects/koesterlab/benchmark-methylation/deamination-pipeline/resources/assigned_bases.txt"
             ],
             "cwd": "${workspaceFolder}" 
         },

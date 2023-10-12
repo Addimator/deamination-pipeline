@@ -1,7 +1,11 @@
 configfile: "config/config.yaml"
 
 accession = config["accession"]
+chromosome_conf = config["sample"]
 genome_config = config["sample"]
+
+scattergather:
+    split_candidates=20,
 
 
 rule all:
@@ -11,7 +15,7 @@ rule all:
 
 rule get_genome:
     output:
-        "resources/example/genome.fasta",
+        "resources/genome.fasta",
     params:
         species=genome_config["species"],
         datatype=genome_config["datatype"],
@@ -25,9 +29,9 @@ rule get_genome:
 
 rule genome_index:
     input:
-        "resources/example/genome.fasta",
+        "resources/genome.fasta",
     output:
-        "resources/example/genome.fasta.fai",
+        "resources/genome.fasta.fai",
     log:
         "logs/genome_index.log",
     conda:
@@ -39,12 +43,29 @@ rule genome_index:
         samtools faidx {params.pipeline_path}{input}
         """
 
+rule filter_genome:
+    input:
+        "resources/genome.fasta",
+    output:
+        "resources/chromosome.fasta",
+    log:
+        "logs/filter_genome.log",
+    conda:
+        "envs/samtools.yaml"
+    params:
+        chromosome=chromosome_conf["chromosome"],
+    threads: 10
+    shell:
+        """ 
+        samtools faidx {input} {params.chromosome} > {output}
+        """
+
 
 rule find_candidates:
     input:
-        "resources/example/genome.fasta",
+        "resources/chromosome.fasta",
     output:
-        "resources/example/candidates.bcf",
+        "resources/candidates.bcf",
     log:
         "logs/find_candidates.log",
     conda:
@@ -58,11 +79,12 @@ rule find_candidates:
         cargo run -- methylation-candidates {params.pipeline_path}{input} {params.pipeline_path}{output}
         """
 
+
 rule candidates_to_vcf:
     input:
-        "resources/example/candidates.bcf",
+        "resources/candidates.bcf",
     output:
-        "resources/example/candidates.vcf",
+        "resources/candidates.vcf",
     conda:
         "envs/samtools.yaml"
     log:
@@ -72,11 +94,39 @@ rule candidates_to_vcf:
         bcftools view {input} > {output}
         """
 
+rule split_candidates:
+    input:
+        "resources/candidates.bcf",
+    output:
+        temp(scatter.split_candidates("resources/candidates_{scatteritem}.bcf"))
+    log:
+        "logs/split_candidates.log",
+    conda:
+        "envs/rbt.yaml"
+    shell:
+        "rbt vcf-split {input} {output}"
+
+rule candidate_splits_to_vcf:
+    input:
+        "resources/candidates_{scatteritem}.bcf"
+    output:
+        temp("resources/candidates_{scatteritem}.vcf"),
+    conda:
+        "envs/samtools.yaml"
+    log:
+        "logs/convert_splits_to_vcf_{scatteritem}.log",
+    shell:
+        """
+        bcftools view {input} > {output}
+        """
+
+
+
 rule get_fastq_pe:
     output:
         # the wildcard name must be accession, pointing to an SRA number
-        "resources/example/{accession}_1.fastq",
-        "resources/example/{accession}_2.fastq",
+        "resources/{accession}_1.fastq",
+        "resources/{accession}_2.fastq",
     log:
         "logs/pe/{accession}.log"
     params:
@@ -88,13 +138,14 @@ rule get_fastq_pe:
         "v2.6.0/bio/sra-tools/fasterq-dump"
 
 
+
 rule align_reads:
     input:
-        fasta="resources/example/genome.fasta",
-        reads1=expand("resources/example/{accession}_1.fastq", accession=accession),
-        reads2=expand("resources/example/{accession}_2.fastq", accession=accession),
+        fasta="resources/genome.fasta",
+        reads1=expand("resources/{accession}_1.fastq", accession=accession),
+        reads2=expand("resources/{accession}_2.fastq", accession=accession),
     output:
-        "resources/example/aligned-reads.bam",
+        "resources/aligned-reads.bam",
     conda:
         "envs/bwa-mem2.yaml"
     log:
@@ -105,65 +156,117 @@ rule align_reads:
         bwa-mem2 mem -t 8 {input.fasta} {input.reads1} {input.reads2} | samtools view -S -b - > {output}
         """
 
+rule sort_aligned_reads:
+    input:
+        "resources/aligned-reads.bam",
+    output:
+        "resources/aligned-reads-sorted.bam",
+    log:
+        "logs/sort_aligned_reads.log",
+    conda:
+        "envs/samtools.yaml"
+    params:
+        pipeline_path=config["pipeline_path"],
+    threads: 10
+    shell:
+        """
+        samtools sort -@ {threads}  {input} -o {output}    
+        """
+    
+
+rule filter_aligned_reads:
+    input:
+        "resources/aligned-reads-sorted.bam",
+    output:
+        bam="resources/aligned-reads-focused.bam",
+        sam="resources/aligned-reads-focused.sam"
+    log:
+        "logs/filter_aligned_reads.log",
+    conda:
+        "envs/samtools.yaml"
+    params:
+        pipeline_path=config["pipeline_path"],
+        chromosome=chromosome_conf["chromosome"],
+    threads: 10
+    shell:
+        """ 
+        samtools index -@ {threads} {params.pipeline_path}{input}
+        samtools view -b -o {output.bam} {input} {params.chromosome}
+        samtools view -h {output.bam} -o {output.sam}
+
+        """
+
+
 rule find_bases:
     input:
-        aligned_reads="resources/example/aligned-reads.sam",
-        candidates="resources/example/candidates.vcf",
+        aligned_reads="resources/aligned-reads-focused.sam",
+        # aligned_reads="resources/aligned-reads.sam",
+        candidates="resources/candidates_{scatteritem}.vcf"
+        # candidates="resources/candidates.vcf",
     output:
-        "resources/example/pos_to_bases.txt",
+        "resources/pos_to_bases_{scatteritem}.txt",
     conda:
         "envs/varlociraptor.yaml"
     params:
         pipeline_path=config["pipeline_path"],
     log:
-        "logs/find_bases.log",
+        "logs/find_bases_{scatteritem}.log",
     shell:
         """
         cd {params.pipeline_path}workflow/scripts
         cargo run  -- find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.candidates} {params.pipeline_path}{output}
        """
 
-rule download_bedGraphs:
-    output:
-        "resources/example/HG002/{bedGraph}.bedGraph.gz",
-    log:
-        "logs/download_bedGraphs{bedGraph}.log",
-    params:
-        pipeline_path=config["pipeline_path"],
-        bedGraphs = config["bedGraphs_HG002"]
-    script:
-        "scripts/get_bedGraph_data.py"
-
-
-rule process_data:
+rule gather_calls:
     input:
-        "resources/example/HG002/{bedGraph}.bedGraph.gz"
+        gather.split_candidates("resources/pos_to_bases_{scatteritem}.txt")
     output:
-        "resources/example/HG002/{bedGraph}.bedGraph"
-    log:
-        "logs/process_data{bedGraph}.log",
+        "resources/pos_to_bases.txt"
     shell:
-        "gunzip -c {input} > {output}"
+        "cat {input} > {output}"
 
 
-rule compute_avg_bedGraph:
-    input:
-        # expand("resources/example/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
-        expand("resources/example/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"])
+# rule download_bedGraphs:
+#     output:
+#         "resources/HG002/{bedGraph}.bedGraph.gz",
+#     log:
+#         "logs/download_bedGraphs{bedGraph}.log",
+#     params:
+#         pipeline_path=config["pipeline_path"],
+#         bedGraphs = config["bedGraphs_HG002"]
+#     script:
+#         "scripts/get_bedGraph_data.py"
 
-    output:
-        "resources/example/bed_avg.bedGraph",
-    log:
-        "logs/compute_avg_bedGraph.log",
-    script:
-        "scripts/compute_avg_bedGraph.py"
+
+# rule process_data:
+#     input:
+#         "resources/HG002/{bedGraph}.bedGraph.gz"
+#     output:
+#         "resources/HG002/{bedGraph}.bedGraph"
+#     log:
+#         "logs/process_data{bedGraph}.log",
+#     shell:
+#         "gunzip -c {input} > {output}"
+
+
+# rule compute_avg_bedGraph:
+#     input:
+#         # expand("resources/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
+#         expand("resources/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"])
+
+#     output:
+#         "resources/bed_avg.bedGraph",
+#     log:
+#         "logs/compute_avg_bedGraph.log",
+#     script:
+#         "scripts/compute_avg_bedGraph.py"
 
 
 
 rule assign_bases:
     input:
-        bedGraph="resources/example/bed_avg.bedGraph",
-        ref_bases="resources/example/pos_to_bases.txt",
+        bedGraph="resources/bed_avg.bedGraph",
+        ref_bases="resources/pos_to_bases.txt",
     output:
         "results/assigned_bases.txt"
     conda:
@@ -177,3 +280,14 @@ rule assign_bases:
         cd {params.pipeline_path}workflow/scripts
         cargo run  -- assign-bases {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{input.ref_bases} {params.pipeline_path}{output}
         """
+
+
+
+
+# rule gather_calls:
+#     input:
+#         gather.split_candidates("results/pos_to_bases_{scatteritem}.txt")
+#     output:
+#         "resources/pos_to_bases.txt"
+#     shell:
+#         "cat {input} > {output}"

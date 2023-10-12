@@ -145,7 +145,12 @@ fn main() -> Result<()> {
                 let bed_fields: Vec<&str> = bed_line.split('\t').collect();
             
                 // Extrahiere relevante Informationen aus dem Bedgraph
-                let chrom = bed_fields[0].to_string();
+                let chrom_orig = bed_fields[0].to_string();
+                let chrom = if let Some(s) = chrom_orig.strip_prefix("chr") {
+                    s.to_string()
+                } else {
+                    chrom_orig
+                };
                 let position = (bed_fields[1].parse::<usize>().expect("Invalid position value") + bed_fields[2].parse::<usize>().expect("Invalid position value")) / 2;
                 let methylation = bed_fields[3].parse::<f64>().expect("Invalid methylation value");
                 

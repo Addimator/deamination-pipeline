@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 
-pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<HashSet<u32>> {
+pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<HashSet<(String, u32)>> {
     let vcf_file = File::open(vcf_file_path)?;
     let vcf_reader = BufReader::new(vcf_file);
 
@@ -18,8 +18,10 @@ pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<HashSet<u32>> {
 
             let fields: Vec<&str> = line.split('\t').collect();
             if fields.len() >= 2 {
-                if let Ok(position) = fields[1].parse::<u32>() {
-                    vcf_positions.insert(position);
+                if let Ok(chrom) = fields[0].parse::<String>() {
+                    if let Ok(position) = fields[1].parse::<u32>() {
+                        vcf_positions.insert((chrom, position));
+                    }
                 }
             }
         }
@@ -29,7 +31,7 @@ pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<HashSet<u32>> {
 }
 
 
-pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<u32>) -> Result<BTreeMap<(String, u32, char), HashMap<char, u32>>> {
+pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<(String, u32)>) -> Result<BTreeMap<(String, u32, char), HashMap<char, u32>>> {
     // Open the SAM file for reading
     let sam_file = File::open(sam_file_path)?;
     let sam_reader = BufReader::new(sam_file);
@@ -53,7 +55,7 @@ pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<u32>
         }
 
         let flag = fields[1].parse::<u32>().unwrap();
-        let reference_name = fields[2].to_string();
+        let chrom = fields[2].to_string();
         let position = fields[3].parse::<u32>().unwrap();
         let sequence = fields[9].as_bytes();
 
@@ -70,9 +72,9 @@ pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<u32>
                 base_pos = position + base_index as u32 - 1;
 
             }
-            if vcf_positions.contains(&base_pos) {
+            if vcf_positions.contains(&(chrom.clone(), base_pos)) {
                 let entry = position_counts
-                    .entry((reference_name.clone(), base_pos, direction))
+                    .entry((chrom.clone(), base_pos, direction))
                     .or_insert(HashMap::new());
                 *entry.entry(*base as char).or_insert(0) += 1;
             }
