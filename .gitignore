@@ -8,5 +8,5 @@ logs/**
 
 # Added by cargo
 
-/target/
-workflow/scripts/target/
+/target/**
+workflow/scripts/target/**
