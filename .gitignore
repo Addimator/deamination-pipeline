@@ -1,0 +1,12 @@
+results/**
+resources/**
+logs/**
+.snakemake
+.snakemake/**
+
+
+
+# Added by cargo
+
+/target/
+workflow/scripts/target/
