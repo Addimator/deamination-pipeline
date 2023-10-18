@@ -54,12 +54,12 @@ pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<(Str
             continue; // Malformed SAM line, skip
         }
 
-        let flag = fields[1].parse::<u32>().unwrap();
+        let flag = fields[1].parse::<u16>().unwrap();
         let chrom = fields[2].to_string();
         let position = fields[3].parse::<u32>().unwrap();
         let sequence = fields[9].as_bytes();
 
-        let reverse_read = flag == 163 || flag == 83 || flag == 16;
+        let reverse_read = read_reverse_strand(flag, false);
         let direction = if reverse_read { 'r' } else { 'f' };
 
     
@@ -83,4 +83,28 @@ pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<(Str
 
 
     Ok(position_counts)
+}
+
+
+fn read_reverse_strand(flag:u16, paired: bool) -> bool {
+    let read_reverse = 0b10000;
+    let mate_reverse = 0b100000;
+    let first_in_pair = 0b1000000;
+    let second_in_pair = 0b10000000;
+    if paired{
+        if (flag & read_reverse) != 0 && (flag & first_in_pair) != 0 {
+            return true
+        }
+        else if (flag & mate_reverse) != 0 && (flag & second_in_pair) != 0 {
+            return true
+        }
+    }
+    else {
+        if (flag & read_reverse) != 0 {
+            return true
+        }
+    }
+    false
+    // read.inner.core.flag == 163 || read.inner.core.flag == 83 || read.inner.core.flag == 16
+    
 }

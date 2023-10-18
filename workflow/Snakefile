@@ -5,12 +5,12 @@ chromosome_conf = config["sample"]
 genome_config = config["sample"]
 
 scattergather:
-    split_candidates=20,
+    split_candidates=1,
 
 
 rule all:
     input:
-        "results/assigned_bases.txt"
+        expand("results/{SRA}/assigned_bases.txt", SRA=accession)
 
 
 rule get_genome:
@@ -125,10 +125,10 @@ rule candidate_splits_to_vcf:
 rule get_fastq_pe:
     output:
         # the wildcard name must be accession, pointing to an SRA number
-        "resources/{accession}_1.fastq",
-        "resources/{accession}_2.fastq",
+        "resources/{SRA}/{accession}_1.fastq",
+        "resources/{SRA}/{accession}_2.fastq",
     log:
-        "logs/pe/{accession}.log"
+        "logs/pe/get_fastq_pe{SRA}_{accession}.log"
     params:
         extra="--skip-technical"
     threads: 6  # defaults to 6
@@ -142,14 +142,14 @@ rule get_fastq_pe:
 rule align_reads:
     input:
         fasta="resources/genome.fasta",
-        reads1=expand("resources/{accession}_1.fastq", accession=accession),
-        reads2=expand("resources/{accession}_2.fastq", accession=accession),
+        reads1="resources/{SRA}/{SRA}_1.fastq",
+        reads2="resources/{SRA}/{SRA}_2.fastq"
     output:
-        "resources/aligned-reads.bam",
+        "resources/{SRA}/aligned-reads.bam",
     conda:
         "envs/bwa-mem2.yaml"
     log:
-        "logs/align_reads.log",
+        "logs/align_reads{SRA}.log",
     shell:
         """
         bwa-mem2 index {input.fasta}
@@ -158,11 +158,11 @@ rule align_reads:
 
 rule sort_aligned_reads:
     input:
-        "resources/aligned-reads.bam",
+        "resources/{SRA}/aligned-reads.bam",
     output:
-        "resources/aligned-reads-sorted.bam",
+        "resources/{SRA}/aligned-reads-sorted.bam",
     log:
-        "logs/sort_aligned_reads.log",
+        "logs/sort_aligned_reads{SRA}.log",
     conda:
         "envs/samtools.yaml"
     params:
@@ -176,12 +176,12 @@ rule sort_aligned_reads:
 
 rule filter_aligned_reads:
     input:
-        "resources/aligned-reads-sorted.bam",
+        "resources/{SRA}/aligned-reads-sorted.bam",
     output:
-        bam="resources/aligned-reads-focused.bam",
-        sam="resources/aligned-reads-focused.sam"
+        bam="resources/{SRA}/aligned-reads-focused.bam",
+        sam="resources/{SRA}/aligned-reads-focused.sam"
     log:
-        "logs/filter_aligned_reads.log",
+        "logs/filter_aligned_reads{SRA}.log",
     conda:
         "envs/samtools.yaml"
     params:
@@ -199,18 +199,18 @@ rule filter_aligned_reads:
 
 rule find_bases:
     input:
-        aligned_reads="resources/aligned-reads-focused.sam",
+        aligned_reads="resources/{SRA}/aligned-reads-focused.sam",
         # aligned_reads="resources/aligned-reads.sam",
         candidates="resources/candidates_{scatteritem}.vcf"
         # candidates="resources/candidates.vcf",
     output:
-        "resources/pos_to_bases_{scatteritem}.txt",
+        "resources/{SRA}/pos_to_bases_{scatteritem}.txt",
     conda:
         "envs/varlociraptor.yaml"
     params:
         pipeline_path=config["pipeline_path"],
     log:
-        "logs/find_bases_{scatteritem}.log",
+        "logs/find_bases_{SRA}_{scatteritem}.log",
     shell:
         """
         cd {params.pipeline_path}workflow/scripts
@@ -219,9 +219,9 @@ rule find_bases:
 
 rule gather_calls:
     input:
-        gather.split_candidates("resources/pos_to_bases_{scatteritem}.txt")
+        gather.split_candidates("resources/{{SRA}}/pos_to_bases_{scatteritem}.txt")
     output:
-        "resources/pos_to_bases.txt"
+        "resources/{SRA}/pos_to_bases.txt"
     shell:
         "cat {input} > {output}"
 
@@ -266,15 +266,15 @@ rule gather_calls:
 rule assign_bases:
     input:
         bedGraph="resources/bed_avg.bedGraph",
-        ref_bases="resources/pos_to_bases.txt",
+        ref_bases="resources/{SRA}/pos_to_bases.txt",
     output:
-        "results/assigned_bases.txt"
+        "results/{SRA}/assigned_bases.txt"
     conda:
         "envs/varlociraptor.yaml"
     params:
         pipeline_path=config["pipeline_path"],
     log:
-        "logs/assign_bases.log",
+        "logs/assign_bases_{SRA}.log",
     shell:
         """
         cd {params.pipeline_path}workflow/scripts
