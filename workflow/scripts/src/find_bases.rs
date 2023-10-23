@@ -5,11 +5,11 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 
-pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<HashSet<(String, u32)>> {
+pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<Vec<(String, u32)>> {
     let vcf_file = File::open(vcf_file_path)?;
     let vcf_reader = BufReader::new(vcf_file);
 
-    let mut vcf_positions = HashSet::new();
+    let mut vcf_positions = Vec::new();
 
     for line in vcf_reader.lines() {
         let line = line?;
@@ -20,7 +20,7 @@ pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<HashSet<(String, 
             if fields.len() >= 2 {
                 if let Ok(chrom) = fields[0].parse::<String>() {
                     if let Ok(position) = fields[1].parse::<u32>() {
-                        vcf_positions.insert((chrom, position));
+                        vcf_positions.push((chrom, position));
                     }
                 }
             }
@@ -31,7 +31,7 @@ pub fn extract_vcf_positions(vcf_file_path: PathBuf) -> Result<HashSet<(String, 
 }
 
 
-pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<(String, u32)>) -> Result<BTreeMap<(String, u32, char), HashMap<char, u32>>> {
+pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &Vec<(String, u32)>) -> Result<BTreeMap<(String, u32, char), HashMap<char, u32>>> {
     // Open the SAM file for reading
     let sam_file = File::open(sam_file_path)?;
     let sam_reader = BufReader::new(sam_file);
@@ -59,7 +59,7 @@ pub fn count_bases_in_reads(sam_file_path: PathBuf, vcf_positions: &HashSet<(Str
         let position = fields[3].parse::<u32>().unwrap();
         let sequence = fields[9].as_bytes();
 
-        let reverse_read = read_reverse_strand(flag, false);
+        let reverse_read = read_reverse_strand(flag, true);
         let direction = if reverse_read { 'r' } else { 'f' };
 
     

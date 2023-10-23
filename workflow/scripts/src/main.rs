@@ -1,19 +1,55 @@
-use std::ffi::c_float;
 use std::fs::File;
-use std::io::{BufReader, Result, BufRead, Write, BufWriter};
+use std::io::{BufReader, BufRead, Write, BufWriter};
 use structopt::StructOpt;
 use std::path::PathBuf;
 use find_bases::{extract_vcf_positions, count_bases_in_reads};
 use assign_bases::update_base_counts;
+use filter_candidates::{filter_mutations, filter_inconsistent};
 use std::collections::HashMap;
+use rust_htslib::bcf::record::Numeric;
+use anyhow::{Context, Ok, Result};
+use rust_htslib::bcf::{Format, Header, Writer};
 
 
 mod find_bases;
 mod assign_bases;
-
+mod filter_candidates;
 
 #[derive(Debug, StructOpt, Clone)]
 pub enum Deamination {
+    #[structopt(
+        name = "filter-candidates",
+        about = "Filter CpG positions according to mutations and consistent part from GIAB",
+        usage = "cargo run -- filter-candidates candidates.vcf mutations.vcf consistent.bedGraph candidates_filtered.vcf"
+    )]
+    CandidateFilter {
+        #[structopt(
+            name = "candidates-all",
+            parse(from_os_str),
+            required = true,
+            help = "VCF file with all CpG positions in the genome"
+        )]
+        candidates: PathBuf,
+        #[structopt(
+            name = "mutations",
+            parse(from_os_str),
+            required = true,
+            help = "VCF file with all the positions of mutations in the genome"
+        )]
+        mutations: PathBuf,
+        #[structopt(
+            name = "consistent-bedGraph",
+            parse(from_os_str),
+            required = true,
+            help = "Bedgraph with all the consistent parts"
+        )]
+        consistent: PathBuf,
+        #[structopt(
+            name = "output", 
+            parse(from_os_str), 
+            help = "Path of output VCF file, if not given output is printed to stdout")]
+        output: Option<PathBuf>,
+    },
     #[structopt(
         name = "find-bases",
         about = "Find bases at CpG sites",
@@ -31,9 +67,9 @@ pub enum Deamination {
             name = "candidates",
             parse(from_os_str),
             required = true,
-            help = "Candidates of CpG positions in BCF format"
+            help = "Candidates of CpG positions in vcf format"
         )]
-        bcf_file_path: PathBuf,
+        vcf_file_path: PathBuf,
         #[structopt(
             name = "output", 
             parse(from_os_str), 
@@ -74,11 +110,61 @@ pub enum Deamination {
 fn main() -> Result<()> {
     let opt = Deamination::from_args();
     match opt {
-        Deamination::BaseFinder { sam_file_path, bcf_file_path, output } => {
+        Deamination::CandidateFilter { candidates, mutations, consistent, output } => {
+            let vcf_positions = extract_vcf_positions(candidates)?;
 
-            let vcf_positions = extract_vcf_positions(bcf_file_path)?;
+            let filtered_vcf_positions = filter_mutations(vcf_positions, mutations)?;
+            // let filtered_vcf_positions = filter_inconsistent(vcf_positions, consistent);
+
+            // let output_file = File::create(output.unwrap())?;
+            // let mut writer = BufWriter::new(output_file);
+
+            //Write the BCF header (every contig appears once)
+            let mut bcf_header = Header::new();
+            for contig_id in filtered_vcf_positions.clone().into_iter().map(|(contig, _)| contig).collect::<Vec<String>>() {
+                let header_contig_line = format!(r#"##contig=<ID={}>"#, contig_id);
+                bcf_header.push_record(header_contig_line.as_bytes());
+            }
+
+            //Create a BCF writer depending on the output (to file or to stdout)
+            let mut bcf_writer;
+            match output {
+                Some(path) => {
+                    bcf_writer = Writer::from_path(path, &bcf_header, true, Format::Bcf)
+                        .with_context(|| format!("error opening BCF writer"))?;
+                }
+                None => {
+                    bcf_writer = Writer::from_stdout(&bcf_header, true, Format::Bcf)
+                        .with_context(|| format!("error opening BCF writer"))?;
+                }
+            }
+
+            //Prepare the records
+            let mut record = bcf_writer.empty_record();
+            for (contig, pos) in filtered_vcf_positions {
+                let rid = bcf_writer
+                    .header()
+                    .name2rid(contig.as_bytes())
+                    .with_context(|| format!("error finding contig {contig} in header."))?;
+                record.set_rid(Some(rid));
+                record.set_pos(pos.to_owned() as i64);
+                let new_alleles: &[&[u8]] = &[b"CG", b"<METH>"];
+                record
+                    .set_alleles(new_alleles)
+                    .with_context(|| format!("error setting alleles"))?;
+                record.set_qual(f32::missing());
+
+                // Write record
+                bcf_writer
+                    .write(&record)
+                    .with_context(|| format!("failed to write BCF record with methylation candidate"))?;
+            }
+        }
+        Deamination::BaseFinder { sam_file_path, vcf_file_path, output } => {
+
+            let vcf_positions = extract_vcf_positions(vcf_file_path)?;
             let position_counts = count_bases_in_reads(sam_file_path, &vcf_positions)?;
-
+            println!("{:?}", vcf_positions);
             // Öffnen Sie die Ausgabedatei zum Schreiben
             let output_file = File::create(output.unwrap())?;
             let mut writer = BufWriter::new(output_file);
@@ -179,9 +265,9 @@ fn main() -> Result<()> {
                         update_base_counts(&mut unmeth_pos_reverse, chrom_clone6, bases_fields_reverse.to_vec());
                     }
                 }
-                else {
-                    println!("Entry not found: ({}, {})", chrom_clone7, position)
-                }
+                // else {
+                //     println!("Entry not found: ({}, {})", chrom_clone7, position)
+                // }
 
             }
 
@@ -193,7 +279,7 @@ fn main() -> Result<()> {
                 None => None, // If `output` is None, don't open any file
             };
         
-            //Create a BCF writer depending on the output (to file or to stdout)
+            //Create a vcf writer depending on the output (to file or to stdout)
             let mut writer: Box<dyn Write> = match output {
                 Some(file) => Box::new(BufWriter::new(file)),
                 None => Box::new(BufWriter::new(std::io::stdout())),
