@@ -111,15 +111,15 @@ fn main() -> Result<()> {
     let opt = Deamination::from_args();
     match opt {
         Deamination::CandidateFilter { candidates, mutations, consistent, output } => {
-            let vcf_positions = extract_vcf_positions(candidates)?;
+            let mut vcf_positions = extract_vcf_positions(candidates)?;
 
             let filtered_vcf_positions = filter_mutations(vcf_positions, mutations)?;
-            // let filtered_vcf_positions = filter_inconsistent(vcf_positions, consistent);
+            let filtered_vcf_positions = filter_inconsistent(filtered_vcf_positions, consistent)?;
 
             // let output_file = File::create(output.unwrap())?;
             // let mut writer = BufWriter::new(output_file);
-
             //Write the BCF header (every contig appears once)
+
             let mut bcf_header = Header::new();
             for contig_id in filtered_vcf_positions.clone().into_iter().map(|(contig, _)| contig).collect::<Vec<String>>() {
                 let header_contig_line = format!(r#"##contig=<ID={}>"#, contig_id);
@@ -147,7 +147,7 @@ fn main() -> Result<()> {
                     .name2rid(contig.as_bytes())
                     .with_context(|| format!("error finding contig {contig} in header."))?;
                 record.set_rid(Some(rid));
-                record.set_pos(pos.to_owned() as i64);
+                record.set_pos(pos as i64 - 1);
                 let new_alleles: &[&[u8]] = &[b"CG", b"<METH>"];
                 record
                     .set_alleles(new_alleles)
@@ -159,6 +159,8 @@ fn main() -> Result<()> {
                     .write(&record)
                     .with_context(|| format!("failed to write BCF record with methylation candidate"))?;
             }
+       
+            
         }
         Deamination::BaseFinder { sam_file_path, vcf_file_path, output } => {
 

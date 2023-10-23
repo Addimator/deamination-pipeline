@@ -5,7 +5,7 @@ chromosome_conf = config["sample"]
 genome_config = config["sample"]
 
 scattergather:
-    split_candidates=20,
+    split_candidates=1,
 
 
 rule all:

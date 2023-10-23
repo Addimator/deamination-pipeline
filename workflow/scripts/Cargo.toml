@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 structopt = "0.3"  # Verwenden Sie die entsprechende Version von structopt
+anyhow = "1.0"
+rust-htslib = "0.43.1"
