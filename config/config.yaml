@@ -6,25 +6,25 @@ sample:
   chromosome: "21"
 
 
-varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
-pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
+# varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
+# pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
 
-# varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
-# pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
+varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
+pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
 
 
 read_type: "Illumina"
 
 # Nicht bisulfitbehandelte Referenzdaten: SRR1766444 (1.18 GB)
 accession: 
-  - "example"
+  # - "example"
   # - "test_reverse"
-  # - "SRR1766444"
+  - "SRR1766444"
   # - "SRR11321732"
   # - "SRR12898345"
   # - "SRR1766451"
   # - "SRR12898336"
-  # - "SRR1766456"
+  - "SRR1766456"
   # - "SRR1766495"
   # - "SRR1766502"
   # - "SRR1766555"

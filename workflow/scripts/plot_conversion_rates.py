@@ -16,14 +16,6 @@ true_dict = {}
 # Create dictionaries for Bedgraph and VCF
 with open(ref_bases_file, 'r') as ref_bases, open(bedGraph_file, 'r') as bedGraph:
 
-    for line in bedGraph:
-        if not line.startswith("track"):
-            parts = line.strip().split('\t')
-            chrom, position, methylation_value, coverage = parts[0], (int(parts[1]) + int(parts[2])) // 2, int(parts[3]), int(parts[4]) + int(parts[5])
-            if coverage > 10:
-                dackel_dict[(chrom, position)] = methylation_value
-
-
     for line in ref_bases:
         if not line.startswith('#'):
             parts = line.strip().split('\t')
@@ -33,9 +25,20 @@ with open(ref_bases_file, 'r') as ref_bases, open(bedGraph_file, 'r') as bedGrap
                 pos_to_bases_dict[(chrom, pos)] = num_t / cov
             if dir == "r" and cov > 10:        
                 pos_to_bases_dict[(chrom, pos)] = num_a / cov
+    
+    
+    for line in bedGraph:
+        if not line.startswith("track"):
+            parts = line.strip().split('\t')
+            chrom, position, methylation_value, coverage = parts[0].replace("chr", ""), (int(parts[1]) + int(parts[2])) // 2, float(parts[3]), int(parts[4]) + int(parts[5])
+            if coverage > 10:
+                dackel_dict[(chrom, position)] = methylation_value
+
+
             
 
-
+print(list(pos_to_bases_dict.keys())[0:10])
+print(list(dackel_dict.keys())[0:10])
 
 bedgraph_positions = [key for key in dackel_dict if key in pos_to_bases_dict]
 bedgraph_meth_values = [dackel_dict[key] for key in bedgraph_positions]
@@ -43,7 +46,8 @@ bedgraph_meth_values = [dackel_dict[key] for key in bedgraph_positions]
 pos_to_bases_positions = [key for key in pos_to_bases_dict if key in dackel_dict]
 pos_to_bases_values = [pos_to_bases_dict[key] * 100 for key in pos_to_bases_positions]
 
-
+print(bedgraph_positions[0:10])
+print(pos_to_bases_positions[0:10])
 missing_positions1 = [key for key in dackel_dict if key not in pos_to_bases_dict]
 missing_positions2 = [key for key in pos_to_bases_dict if key not in dackel_dict]
 

@@ -5,7 +5,7 @@ chromosome_conf = config["sample"]
 genome_config = config["sample"]
 
 scattergather:
-    split_candidates=1,
+    split_candidates=20,
 
 
 rule all:
@@ -122,23 +122,42 @@ rule candidate_splits_to_vcf:
 
 rule download_giab_annotations:
     output:
-        inconsistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
+        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
+        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
     params:
-        inconsistent="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
+        consistent="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
         mutations="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
     shell:
         """
-        wget -O {output.inconsistent} {params.inconsistent}
-        wget -O {output.mutations}.gz {params.mutations} && gunzip {output.mutations}.gz 
+        wget -O {output.consistent} {params.consistent}
+        wget -O {output.mutations} {params.mutations}
         """
+
+rule filter_giab_annotations:
+    input:
+        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
+        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
+    output:
+        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed",
+        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf"
+    params:
+        chromosome="chr" + chromosome_conf["chromosome"],
+    conda:
+        "envs/samtools.yaml"
+    shell:
+        """
+        bcftools index {input.mutations}
+        bcftools view -r {params.chromosome} {input.mutations} -o {output.mutations}
+        awk '$1 == "{params.chromosome}"' {input.consistent} > {output.consistent}
+        """
+
 
 
 rule filter_candidates:
     input:
         candidates="resources/candidates_{scatteritem}.vcf",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf",
-        inconsistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed"
+        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf",
+        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed"
     output:
         "resources/candidates_filtered_{scatteritem}.bcf",
     conda:
@@ -150,7 +169,7 @@ rule filter_candidates:
     shell:
         """
         cd {params.pipeline_path}workflow/scripts   
-        cargo run  -- filter-candidates {params.pipeline_path}{input.candidates} {params.pipeline_path}{input.mutations} {params.pipeline_path}{input.inconsistent} {params.pipeline_path}{output}
+        cargo run  -- filter-candidates {params.pipeline_path}{input.candidates} {params.pipeline_path}{input.mutations} {params.pipeline_path}{input.consistent} {params.pipeline_path}{output}
         """
 
 rule candidate_filtered_to_vcf:
@@ -310,7 +329,7 @@ rule gather_calls:
 rule c_to_t_rates:
     input:
         ref_bases="resources/{SRA}/pos_to_bases.txt",
-        bedGraph="resources/alignments_CpG.bedGraph",
+        bedGraph="resources/bed_avg.bedGraph",
     output:
         rates="resources/{SRA}/c_to_t_rates.png",
     conda:

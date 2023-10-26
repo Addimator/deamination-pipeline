@@ -4,6 +4,7 @@ use std::io::{BufReader, Result, BufRead};
 use std::path::PathBuf;
 
 
+
 pub fn filter_mutations(mut vcf_positions: Vec<(String, u32)>, mutations: PathBuf) -> Result<Vec<(String, u32)>> {
     let mutations_file = File::open(mutations)?;
     let vcf_reader = BufReader::new(mutations_file);
@@ -13,15 +14,16 @@ pub fn filter_mutations(mut vcf_positions: Vec<(String, u32)>, mutations: PathBu
         let line = line?;
         if !line.starts_with('#') {
             // Skip comment lines
-            println!("LINE: {:?}", line); 
             let fields: Vec<&str> = line.split('\t').collect();
             if fields.len() >= 2 {
-                let chrom = fields[0].to_string();
-                if let Ok(pos) = fields[1].parse::<u32>() {
-                    let reference = fields[3].to_string();
-                    let alternate = fields[4].to_string();
-                    if vcf_positions.contains(&(chrom.clone(), pos)) && reference == "C" {
-                        to_remove.push((chrom, pos));
+                if let [chrom, pos, _, reference, alternate, ..] = &fields[..] {
+                    let chrom = chrom.trim_start_matches("chr");
+
+                    if let Ok(pos) = pos.parse::<u32>() {
+                        if vcf_positions.contains(&(chrom.to_string(), pos)) {
+                            to_remove.push((chrom.to_string(), pos));
+                            println!("VCF filtering: Chrom {:?} Pos {:?}", chrom, pos);
+                        }
                     }
                 }
             }
@@ -46,18 +48,16 @@ pub fn filter_inconsistent(mut vcf_positions: Vec<(String, u32)>, consistent: Pa
         }
         let bed_fields: Vec<&str> = bed_line.split('\t').collect();
     
-        // Extrahiere relevante Informationen aus dem Bedgraph
-        let chrom_orig = bed_fields[0].to_string();
-        let chrom = if let Some(s) = chrom_orig.strip_prefix("chr") {
-            s.to_string()
-        } else {
-            chrom_orig
-        };
-        let start = bed_fields[1].parse::<usize>().expect("Invalid position value") + 1;
-        let end = bed_fields[2].parse::<usize>().expect("Invalid position value");
-        for pos in start..end {
-            if vcf_positions.contains(&(chrom.clone(), pos as u32)) {
-                vcf_positions_filtered.push((chrom.clone(), pos as u32));
+        if let [chrom_orig, start, end, ..] = &bed_fields[..] {
+            let chrom = chrom_orig.trim_start_matches("chr");
+            let start = start.parse::<u32>().expect("Invalid position value") + 1;
+            let end = end.parse::<u32>().expect("Invalid position value");
+
+            for pos in start..end {
+                if vcf_positions.contains(&(chrom.to_string(), pos)) {
+                    vcf_positions_filtered.push((chrom.to_string(), pos));
+                    println!("Bedgraph filtering: Chrom {:?} Pos {:?}", chrom, pos);
+                }
             }
         }
     }

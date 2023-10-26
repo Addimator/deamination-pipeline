@@ -112,9 +112,10 @@ fn main() -> Result<()> {
     match opt {
         Deamination::CandidateFilter { candidates, mutations, consistent, output } => {
             let mut vcf_positions = extract_vcf_positions(candidates)?;
-
+            println!("TEST");
             let filtered_vcf_positions = filter_mutations(vcf_positions, mutations)?;
             let filtered_vcf_positions = filter_inconsistent(filtered_vcf_positions, consistent)?;
+            // let filtered_vcf_positions = filter_inconsistent(vcf_positions, consistent)?;
 
             // let output_file = File::create(output.unwrap())?;
             // let mut writer = BufWriter::new(output_file);
