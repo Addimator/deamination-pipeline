@@ -21,9 +21,9 @@ with open(ref_bases_file, 'r') as ref_bases, open(bedGraph_file, 'r') as bedGrap
             parts = line.strip().split('\t')
             chrom, pos = parts[0], int(parts[1])
             dir, num_a, num_t, cov = parts[2], float(parts[3]), float(parts[6]), int(parts[3]) + int(parts[4]) + int(parts[5]) + int(parts[6]) + int(parts[7])
-            if dir == "f" and cov > 10:        
+            if dir == "f" and cov > 0:        
                 pos_to_bases_dict[(chrom, pos)] = num_t / cov
-            if dir == "r" and cov > 10:        
+            if dir == "r" and cov > 0:        
                 pos_to_bases_dict[(chrom, pos)] = num_a / cov
     
     
@@ -31,7 +31,7 @@ with open(ref_bases_file, 'r') as ref_bases, open(bedGraph_file, 'r') as bedGrap
         if not line.startswith("track"):
             parts = line.strip().split('\t')
             chrom, position, methylation_value, coverage = parts[0].replace("chr", ""), (int(parts[1]) + int(parts[2])) // 2, float(parts[3]), int(parts[4]) + int(parts[5])
-            if coverage > 10:
+            if coverage > 0:
                 dackel_dict[(chrom, position)] = methylation_value
 
 
@@ -39,6 +39,9 @@ with open(ref_bases_file, 'r') as ref_bases, open(bedGraph_file, 'r') as bedGrap
 
 print(list(pos_to_bases_dict.keys())[0:10])
 print(list(dackel_dict.keys())[0:10])
+print(('21', 42957864) in pos_to_bases_dict)
+print(('21', 42957864) in dackel_dict)
+
 
 bedgraph_positions = [key for key in dackel_dict if key in pos_to_bases_dict]
 bedgraph_meth_values = [dackel_dict[key] for key in bedgraph_positions]

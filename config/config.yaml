@@ -8,9 +8,12 @@ sample:
 
 # varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
 # pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
+# deamination_path: "~/Documents/Promotion/deamination/"
+
 
 varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
 pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
+deamination_path: "/projects/koesterlab/benchmark-methylation/deamination/"
 
 
 read_type: "Illumina"
@@ -22,12 +25,12 @@ accession:
   - "SRR1766444"
   # - "SRR11321732"
   # - "SRR12898345"
-  # - "SRR1766451"
+  - "SRR1766451"
   # - "SRR12898336"
   - "SRR1766456"
-  # - "SRR1766495"
-  # - "SRR1766502"
-  # - "SRR1766555"
+  - "SRR1766495"
+  - "SRR1766502"
+  - "SRR1766555"
 
 
 bedGraphs_HG002:

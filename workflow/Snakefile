@@ -120,6 +120,19 @@ rule candidate_splits_to_vcf:
         bcftools view {input} > {output}
         """
 
+# Just for debugging reasons
+rule get_candidate_neighborhood:
+    input:
+        genome="resources/genome.fasta"
+    output:
+        "resources/candidate_neighborhood.txt"
+    params:
+        pipeline_path=config["pipeline_path"],
+        candidate=1005
+    script:
+        "scripts/candidate_neighborhood.py"
+
+
 rule download_giab_annotations:
     output:
         consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
@@ -164,11 +177,12 @@ rule filter_candidates:
         "envs/varlociraptor.yaml"
     params:
         pipeline_path=config["pipeline_path"],
+        deamination_path=config["deamination_path"],
     log:
         "logs/filter_candidates{scatteritem}.log",
     shell:
         """
-        cd {params.pipeline_path}workflow/scripts   
+        cd {params.deamination_path}   
         cargo run  -- filter-candidates {params.pipeline_path}{input.candidates} {params.pipeline_path}{input.mutations} {params.pipeline_path}{input.consistent} {params.pipeline_path}{output}
         """
 
@@ -274,11 +288,13 @@ rule find_bases:
         "envs/varlociraptor.yaml"
     params:
         pipeline_path=config["pipeline_path"],
+        deamination_path=config["deamination_path"],
+
     log:
         "logs/find_bases_{SRA}_{scatteritem}.log",
     shell:
         """
-        cd {params.pipeline_path}workflow/scripts
+        cd {params.deamination_path}
         cargo run  -- find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.candidates} {params.pipeline_path}{output}
        """
 
@@ -291,40 +307,40 @@ rule gather_calls:
         "cat {input} > {output}"
 
 
-# rule download_bedGraphs:
-#     output:
-#         "resources/HG002/{bedGraph}.bedGraph.gz",
-#     log:
-#         "logs/download_bedGraphs{bedGraph}.log",
-#     params:
-#         pipeline_path=config["pipeline_path"],
-#         bedGraphs = config["bedGraphs_HG002"]
-#     script:
-#         "scripts/get_bedGraph_data.py"
+rule download_bedGraphs:
+    output:
+        "resources/HG002/{bedGraph}.bedGraph.gz",
+    log:
+        "logs/download_bedGraphs{bedGraph}.log",
+    params:
+        pipeline_path=config["pipeline_path"],
+        bedGraphs = config["bedGraphs_HG002"]
+    script:
+        "scripts/get_bedGraph_data.py"
 
 
-# rule process_data:
-#     input:
-#         "resources/HG002/{bedGraph}.bedGraph.gz"
-#     output:
-#         "resources/HG002/{bedGraph}.bedGraph"
-#     log:
-#         "logs/process_data{bedGraph}.log",
-#     shell:
-#         "gunzip -c {input} > {output}"
+rule process_data:
+    input:
+        "resources/HG002/{bedGraph}.bedGraph.gz"
+    output:
+        "resources/HG002/{bedGraph}.bedGraph"
+    log:
+        "logs/process_data{bedGraph}.log",
+    shell:
+        "gunzip -c {input} > {output}"
 
 
-# rule compute_avg_bedGraph:
-#     input:
-#         # expand("resources/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
-#         expand("resources/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"])
+rule compute_avg_bedGraph:
+    input:
+        # expand("resources/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
+        expand("resources/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"])
 
-#     output:
-#         "resources/bed_avg.bedGraph",
-#     log:
-#         "logs/compute_avg_bedGraph.log",
-#     script:
-#         "scripts/compute_avg_bedGraph.py"
+    output:
+        "resources/bed_avg.bedGraph",
+    log:
+        "logs/compute_avg_bedGraph.log",
+    script:
+        "scripts/compute_avg_bedGraph.py"
 
 rule c_to_t_rates:
     input:
@@ -344,8 +360,8 @@ rule c_to_t_rates:
 
 rule assign_bases:
     input:
-        # bedGraph="resources/bed_avg.bedGraph",
-        bedGraph="resources/alignments_CpG.bedGraph",
+        bedGraph="resources/bed_avg.bedGraph",
+        # bedGraph="resources/alignments_CpG.bedGraph",
         ref_bases="resources/{SRA}/pos_to_bases.txt",
     output:
         "results/{SRA}/assigned_bases.txt"
@@ -353,11 +369,13 @@ rule assign_bases:
         "envs/varlociraptor.yaml"
     params:
         pipeline_path=config["pipeline_path"],
+        deamination_path=config["deamination_path"],
+
     log:
         "logs/assign_bases_{SRA}.log",
     shell:
         """
-        cd {params.pipeline_path}workflow/scripts
+        cd {params.deamination_path}
         cargo run  -- assign-bases {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{input.ref_bases} {params.pipeline_path}{output}
         """
 
