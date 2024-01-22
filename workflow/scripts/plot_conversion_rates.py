@@ -39,9 +39,6 @@ with open(ref_bases_file, 'r') as ref_bases, open(bedGraph_file, 'r') as bedGrap
 
 print(list(pos_to_bases_dict.keys())[0:10])
 print(list(dackel_dict.keys())[0:10])
-print(('21', 42957864) in pos_to_bases_dict)
-print(('21', 42957864) in dackel_dict)
-
 
 bedgraph_positions = [key for key in dackel_dict if key in pos_to_bases_dict]
 bedgraph_meth_values = [dackel_dict[key] for key in bedgraph_positions]

@@ -1,8 +1,11 @@
 configfile: "config/config.yaml"
 
+
 accession = config["accession"]
 chromosome_conf = config["sample"]
 genome_config = config["sample"]
+candidate = config["candidate"]
+
 
 scattergather:
     split_candidates=20,
@@ -10,7 +13,7 @@ scattergather:
 
 rule all:
     input:
-        expand("results/{SRA}/assigned_bases.txt", SRA=accession)
+        expand("results/{SRA}/assigned_bases.txt", SRA=accession),
 
 
 rule get_genome:
@@ -27,6 +30,7 @@ rule get_genome:
     wrapper:
         "v2.3.2/bio/reference/ensembl-sequence"
 
+
 rule genome_index:
     input:
         "resources/genome.fasta",
@@ -42,6 +46,7 @@ rule genome_index:
         """ 
         samtools faidx {params.pipeline_path}{input}
         """
+
 
 rule filter_genome:
     input:
@@ -94,11 +99,12 @@ rule candidates_to_vcf:
         bcftools view {input} > {output}
         """
 
+
 rule split_candidates:
     input:
         "resources/candidates.bcf",
     output:
-        temp(scatter.split_candidates("resources/candidates_{scatteritem}.bcf"))
+        temp(scatter.split_candidates("resources/candidates_{scatteritem}.bcf")),
     log:
         "logs/split_candidates.log",
     conda:
@@ -106,9 +112,10 @@ rule split_candidates:
     shell:
         "rbt vcf-split {input} {output}"
 
+
 rule candidate_splits_to_vcf:
     input:
-        "resources/candidates_{scatteritem}.bcf"
+        "resources/candidates_{scatteritem}.bcf",
     output:
         temp("resources/candidates_{scatteritem}.vcf"),
     conda:
@@ -120,39 +127,50 @@ rule candidate_splits_to_vcf:
         bcftools view {input} > {output}
         """
 
+
 # Just for debugging reasons
 rule get_candidate_neighborhood:
     input:
-        genome="resources/genome.fasta"
+        genome="resources/genome.fasta",
     output:
-        "resources/candidate_neighborhood.txt"
+        "resources/candidate_neighborhood.txt",
     params:
         pipeline_path=config["pipeline_path"],
-        candidate=1005
-    script:
-        "scripts/candidate_neighborhood.py"
+        chrom=21,
+        candidate=candidate,
+        left_border=candidate - 150,
+        right_border=candidate + 150,
+        candidate_left=candidate - 1,
+        candidate_right=candidate + 1,
+    conda:
+        "envs/samtools.yaml"
+    shell:
+        """
+        samtools faidx resources/genome.fasta "{params.chrom}:{params.left_border}-{params.candidate_left}" && samtools faidx resources/genome.fasta "{params.chrom}:{params.candidate}-{params.candidate}" && samtools faidx resources/genome.fasta "{params.chrom}:{params.candidate_right}-{params.right_border}"
+        """
 
 
 rule download_giab_annotations:
     output:
         consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
+        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz",
     params:
         consistent="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
-        mutations="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
+        mutations="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz",
     shell:
         """
         wget -O {output.consistent} {params.consistent}
         wget -O {output.mutations} {params.mutations}
         """
 
+
 rule filter_giab_annotations:
     input:
         consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
+        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz",
     output:
         consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf"
+        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf",
     params:
         chromosome="chr" + chromosome_conf["chromosome"],
     conda:
@@ -165,12 +183,11 @@ rule filter_giab_annotations:
         """
 
 
-
 rule filter_candidates:
     input:
         candidates="resources/candidates_{scatteritem}.vcf",
         mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf",
-        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed"
+        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed",
     output:
         "resources/candidates_filtered_{scatteritem}.bcf",
     conda:
@@ -186,9 +203,10 @@ rule filter_candidates:
         cargo run  -- filter-candidates {params.pipeline_path}{input.candidates} {params.pipeline_path}{input.mutations} {params.pipeline_path}{input.consistent} {params.pipeline_path}{output}
         """
 
+
 rule candidate_filtered_to_vcf:
     input:
-        "resources/candidates_filtered_{scatteritem}.bcf"
+        "resources/candidates_filtered_{scatteritem}.bcf",
     output:
         "resources/candidates_filtered_{scatteritem}.vcf",
     conda:
@@ -207,33 +225,90 @@ rule get_fastq_pe:
         "resources/{SRA}/{accession}_1.fastq",
         "resources/{SRA}/{accession}_2.fastq",
     log:
-        "logs/pe/get_fastq_pe{SRA}_{accession}.log"
+        "logs/pe/get_fastq_pe{SRA}_{accession}.log",
     params:
-        extra="--skip-technical"
+        extra="--skip-technical",
     threads: 6  # defaults to 6
     conda:
         "envs/fastq-wrapper.yaml"
+    resources:
+        mem_mb=512,
     wrapper:
         "v2.6.0/bio/sra-tools/fasterq-dump"
 
 
+rule get_pcr_free_data_forward:
+    output:
+        "resources/{SRA}/{accession}_1.fastq.gz",
+    log:
+        "logs/get_pcr_free_data_forward{SRA}/{accession}.log",
+    params:
+        pipeline_path=config["pipeline_path"],
+    shell:
+        "wget https://s3-us-west-2.amazonaws.com/human-pangenomics/NHGRI_UCSC_panel/HG002/hpp_HG002_NA24385_son_v1/ILMN/downsampled/HG002_HiSeq30x_subsampled_R1.fastq.gz -O {params.pipeline_path}{output.forward}"
 
-rule align_reads:
+
+rule get_pcr_free_data_reverse:
+    output:
+        "resources/{SRA}/{accession}_2.fastq.gz",
+    log:
+        "logs/get_pcr_free_data_reverse{SRA}/{accession}.log",
+    params:
+        pipeline_path=config["pipeline_path"],
+    shell:
+        "wget https://s3-us-west-2.amazonaws.com/human-pangenomics/NHGRI_UCSC_panel/HG002/hpp_HG002_NA24385_son_v1/ILMN/downsampled/HG002_HiSeq30x_subsampled_R2.fastq.gz -O {params.pipeline_path}{output.forward}"
+
+
+rule decompress_fastq:
+    input:
+        r1="resources/{SRA}/{accession}_1.fastq.gz",
+        r2="resources/{SRA}/{accession}_2.fastq.gz",
+    output:
+        r1="resources/{SRA}/{accession}_1.fastq",
+        r2="resources/{SRA}/{accession}_2.fastq",
+    shell:
+        "gunzip -c {input.r1} > {output.r1}"
+        "gunzip -c {input.r2} > {output.r2}"
+
+
+# single_end
+# rule align_reads_se:
+#     input:
+#         fasta="resources/genome.fasta",
+#         reads1="resources/{SRA}/{accession}.fastq",
+#     output:
+#         "resources/{SRA}{accession}/aligned-reads.bam",
+#     conda:
+#         "envs/bwa-mem2.yaml"
+#     log:
+#         "logs/align_reads_{SRA}.log",
+#     shell:
+#         """
+#         bwa-mem2 index {input.fasta}
+#         bwa-mem2 mem -t 8 {input.fasta} {input.reads1} | samtools view -S -b - > {output}
+#         """
+
+
+# # paired end
+rule align_reads_pe:
     input:
         fasta="resources/genome.fasta",
-        reads1="resources/{SRA}/{SRA}_1.fastq",
-        reads2="resources/{SRA}/{SRA}_2.fastq"
+        reads1="resources/{SRA}/{accession}_1.fastq",
+        reads2="resources/{SRA}/{accession}_2.fastq",
     output:
         "resources/{SRA}/aligned-reads.bam",
     conda:
         "envs/bwa-mem2.yaml"
     log:
-        "logs/align_reads{SRA}.log",
+        "logs/align_reads{SRA}{accession}.log",
+    resources:
+        mem_mb=1024,
     shell:
         """
         bwa-mem2 index {input.fasta}
         bwa-mem2 mem -t 8 {input.fasta} {input.reads1} {input.reads2} | samtools view -S -b - > {output}
         """
+
 
 rule sort_aligned_reads:
     input:
@@ -251,14 +326,14 @@ rule sort_aligned_reads:
         """
         samtools sort -@ {threads}  {input} -o {output}    
         """
-    
+
 
 rule filter_aligned_reads:
     input:
         "resources/{SRA}/aligned-reads-sorted.bam",
     output:
         bam="resources/{SRA}/aligned-reads-focused.bam",
-        sam="resources/{SRA}/aligned-reads-focused.sam"
+        sam="resources/{SRA}/aligned-reads-focused.sam",
     log:
         "logs/filter_aligned_reads{SRA}.log",
     conda:
@@ -280,7 +355,7 @@ rule find_bases:
     input:
         aligned_reads="resources/{SRA}/aligned-reads-focused.sam",
         # aligned_reads="resources/aligned-reads.sam",
-        candidates="resources/candidates_filtered_{scatteritem}.vcf"
+        candidates="resources/candidates_filtered_{scatteritem}.vcf",
         # candidates="resources/candidates.vcf",
     output:
         "resources/{SRA}/pos_to_bases_{scatteritem}.txt",
@@ -289,7 +364,6 @@ rule find_bases:
     params:
         pipeline_path=config["pipeline_path"],
         deamination_path=config["deamination_path"],
-
     log:
         "logs/find_bases_{SRA}_{scatteritem}.log",
     shell:
@@ -298,11 +372,12 @@ rule find_bases:
         cargo run  -- find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.candidates} {params.pipeline_path}{output}
        """
 
+
 rule gather_calls:
     input:
-        gather.split_candidates("resources/{{SRA}}/pos_to_bases_{scatteritem}.txt")
+        gather.split_candidates("resources/{{SRA}}/pos_to_bases_{scatteritem}.txt"),
     output:
-        "resources/{SRA}/pos_to_bases.txt"
+        "resources/{SRA}/pos_to_bases.txt",
     shell:
         "cat {input} > {output}"
 
@@ -314,16 +389,16 @@ rule download_bedGraphs:
         "logs/download_bedGraphs{bedGraph}.log",
     params:
         pipeline_path=config["pipeline_path"],
-        bedGraphs = config["bedGraphs_HG002"]
+        bedGraphs=config["bedGraphs_HG002"],
     script:
         "scripts/get_bedGraph_data.py"
 
 
 rule process_data:
     input:
-        "resources/HG002/{bedGraph}.bedGraph.gz"
+        "resources/HG002/{bedGraph}.bedGraph.gz",
     output:
-        "resources/HG002/{bedGraph}.bedGraph"
+        "resources/HG002/{bedGraph}.bedGraph",
     log:
         "logs/process_data{bedGraph}.log",
     shell:
@@ -333,14 +408,16 @@ rule process_data:
 rule compute_avg_bedGraph:
     input:
         # expand("resources/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
-        expand("resources/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"])
-
+        expand(
+            "resources/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"]
+        ),
     output:
         "resources/bed_avg.bedGraph",
     log:
         "logs/compute_avg_bedGraph.log",
     script:
         "scripts/compute_avg_bedGraph.py"
+
 
 rule c_to_t_rates:
     input:
@@ -356,21 +433,18 @@ rule c_to_t_rates:
         "scripts/plot_conversion_rates.py"
 
 
-
-
 rule assign_bases:
     input:
         bedGraph="resources/bed_avg.bedGraph",
         # bedGraph="resources/alignments_CpG.bedGraph",
         ref_bases="resources/{SRA}/pos_to_bases.txt",
     output:
-        "results/{SRA}/assigned_bases.txt"
+        "results/{SRA}/assigned_bases.txt",
     conda:
         "envs/varlociraptor.yaml"
     params:
         pipeline_path=config["pipeline_path"],
         deamination_path=config["deamination_path"],
-
     log:
         "logs/assign_bases_{SRA}.log",
     shell:
@@ -380,6 +454,23 @@ rule assign_bases:
         """
 
 
+rule plot_methylation_status:
+    input:
+        bedGraph="resources/bed_avg.bedGraph",
+        # bedGraph="resources/alignments_CpG.bedGraph",
+        ref_bases="resources/{SRA}/pos_to_bases.txt",
+    output:
+        unmeth="results/{SRA}/unmeth.png",
+        meth="results/{SRA}/meth.png",
+    conda:
+        "envs/plot.yaml"
+    params:
+        pipeline_path=config["pipeline_path"],
+        deamination_path=config["deamination_path"],
+    log:
+        "logs/plot_methylation_status{SRA}.log",
+    script:
+        "scripts/plot_methylation_status.py"
 
 
 # rule gather_calls:
