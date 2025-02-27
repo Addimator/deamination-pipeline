@@ -5,360 +5,35 @@ accession = config["accession"]
 chromosome_conf = config["sample"]
 genome_config = config["sample"]
 candidate = config["candidate"]
+# chr_chromosomes = "chr" + str(config["chromosome"])
 
 
 scattergather:
     split_candidates=20,
 
 
+include: "rules/align_reads.smk"
+include: "rules/avg_bedgraph.smk"
+include: "rules/candidates.smk"
+include: "rules/get_data.smk"
+
+
 rule all:
     input:
         expand("results/{SRA}/assigned_bases.txt", SRA=accession),
-
-
-rule get_genome:
-    output:
-        "resources/genome.fasta",
-    params:
-        species=genome_config["species"],
-        datatype=genome_config["datatype"],
-        build=genome_config["build"],
-        release=genome_config["release"],
-    log:
-        "logs/get_genome.log",
-    cache: "omit-software"  # save space and time with between workflow caching (see docs)
-    wrapper:
-        "v2.3.2/bio/reference/ensembl-sequence"
-
-
-rule genome_index:
-    input:
-        "resources/genome.fasta",
-    output:
-        "resources/genome.fasta.fai",
-    log:
-        "logs/genome_index.log",
-    conda:
-        "envs/samtools.yaml"
-    params:
-        pipeline_path=config["pipeline_path"],
-    shell:
-        """ 
-        samtools faidx {params.pipeline_path}{input}
-        """
-
-
-rule filter_genome:
-    input:
-        "resources/genome.fasta",
-    output:
-        "resources/chromosome.fasta",
-    log:
-        "logs/filter_genome.log",
-    conda:
-        "envs/samtools.yaml"
-    params:
-        chromosome=chromosome_conf["chromosome"],
-    threads: 10
-    shell:
-        """ 
-        samtools faidx {input} {params.chromosome} > {output}
-        """
-
-
-rule find_candidates:
-    input:
-        "resources/chromosome.fasta",
-    output:
-        "resources/candidates.bcf",
-    log:
-        "logs/find_candidates.log",
-    conda:
-        "envs/varlociraptor.yaml"
-    params:
-        varlo_path=config["varlo_path"],
-        pipeline_path=config["pipeline_path"],
-    shell:
-        """ 
-        cd {params.varlo_path}
-        cargo run -- methylation-candidates {params.pipeline_path}{input} {params.pipeline_path}{output}
-        """
-
-
-rule candidates_to_vcf:
-    input:
-        "resources/candidates.bcf",
-    output:
-        "resources/candidates.vcf",
-    conda:
-        "envs/samtools.yaml"
-    log:
-        "logs/convert_to_vcf.log",
-    shell:
-        """
-        bcftools view {input} > {output}
-        """
-
-
-rule split_candidates:
-    input:
-        "resources/candidates.bcf",
-    output:
-        temp(scatter.split_candidates("resources/candidates_{scatteritem}.bcf")),
-    log:
-        "logs/split_candidates.log",
-    conda:
-        "envs/rbt.yaml"
-    shell:
-        "rbt vcf-split {input} {output}"
-
-
-rule candidate_splits_to_vcf:
-    input:
-        "resources/candidates_{scatteritem}.bcf",
-    output:
-        temp("resources/candidates_{scatteritem}.vcf"),
-    conda:
-        "envs/samtools.yaml"
-    log:
-        "logs/convert_splits_to_vcf_{scatteritem}.log",
-    shell:
-        """
-        bcftools view {input} > {output}
-        """
-
-
-# Just for debugging reasons
-rule get_candidate_neighborhood:
-    input:
-        genome="resources/genome.fasta",
-    output:
-        "resources/candidate_neighborhood.txt",
-    params:
-        pipeline_path=config["pipeline_path"],
-        chrom=21,
-        candidate=candidate,
-        left_border=candidate - 150,
-        right_border=candidate + 150,
-        candidate_left=candidate - 1,
-        candidate_right=candidate + 1,
-    conda:
-        "envs/samtools.yaml"
-    shell:
-        """
-        samtools faidx resources/genome.fasta "{params.chrom}:{params.left_border}-{params.candidate_left}" && samtools faidx resources/genome.fasta "{params.chrom}:{params.candidate}-{params.candidate}" && samtools faidx resources/genome.fasta "{params.chrom}:{params.candidate_right}-{params.right_border}"
-        """
-
-
-rule download_giab_annotations:
-    output:
-        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz",
-    params:
-        consistent="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
-        mutations="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz",
-    shell:
-        """
-        wget -O {output.consistent} {params.consistent}
-        wget -O {output.mutations} {params.mutations}
-        """
-
-
-rule filter_giab_annotations:
-    input:
-        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz",
-    output:
-        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf",
-    params:
-        chromosome="chr" + chromosome_conf["chromosome"],
-    conda:
-        "envs/samtools.yaml"
-    shell:
-        """
-        bcftools index {input.mutations}
-        bcftools view -r {params.chromosome} {input.mutations} -o {output.mutations}
-        awk '$1 == "{params.chromosome}"' {input.consistent} > {output.consistent}
-        """
-
-
-rule filter_candidates:
-    input:
-        candidates="resources/candidates_{scatteritem}.vcf",
-        mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf",
-        consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed",
-    output:
-        "resources/candidates_filtered_{scatteritem}.bcf",
-    conda:
-        "envs/varlociraptor.yaml"
-    params:
-        pipeline_path=config["pipeline_path"],
-        deamination_path=config["deamination_path"],
-    log:
-        "logs/filter_candidates{scatteritem}.log",
-    shell:
-        """
-        cd {params.deamination_path}   
-        cargo run  -- filter-candidates {params.pipeline_path}{input.candidates} {params.pipeline_path}{input.mutations} {params.pipeline_path}{input.consistent} {params.pipeline_path}{output}
-        """
-
-
-rule candidate_filtered_to_vcf:
-    input:
-        "resources/candidates_filtered_{scatteritem}.bcf",
-    output:
-        "resources/candidates_filtered_{scatteritem}.vcf",
-    conda:
-        "envs/samtools.yaml"
-    log:
-        "logs/candidate_filtered_to_vcf{scatteritem}.log",
-    shell:
-        """
-        bcftools view {input} > {output}
-        """
-
-
-rule get_fastq_pe:
-    output:
-        # the wildcard name must be accession, pointing to an SRA number
-        "resources/{SRA}/{accession}_1.fastq",
-        "resources/{SRA}/{accession}_2.fastq",
-    log:
-        "logs/pe/get_fastq_pe{SRA}_{accession}.log",
-    params:
-        extra="--skip-technical",
-    threads: 6  # defaults to 6
-    conda:
-        "envs/fastq-wrapper.yaml"
-    resources:
-        mem_mb=512,
-    wrapper:
-        "v2.6.0/bio/sra-tools/fasterq-dump"
-
-
-rule get_pcr_free_data_forward:
-    output:
-        "resources/{SRA}/{accession}_1.fastq.gz",
-    log:
-        "logs/get_pcr_free_data_forward{SRA}/{accession}.log",
-    params:
-        pipeline_path=config["pipeline_path"],
-    shell:
-        "wget https://s3-us-west-2.amazonaws.com/human-pangenomics/NHGRI_UCSC_panel/HG002/hpp_HG002_NA24385_son_v1/ILMN/downsampled/HG002_HiSeq30x_subsampled_R1.fastq.gz -O {params.pipeline_path}{output.forward}"
-
-
-rule get_pcr_free_data_reverse:
-    output:
-        "resources/{SRA}/{accession}_2.fastq.gz",
-    log:
-        "logs/get_pcr_free_data_reverse{SRA}/{accession}.log",
-    params:
-        pipeline_path=config["pipeline_path"],
-    shell:
-        "wget https://s3-us-west-2.amazonaws.com/human-pangenomics/NHGRI_UCSC_panel/HG002/hpp_HG002_NA24385_son_v1/ILMN/downsampled/HG002_HiSeq30x_subsampled_R2.fastq.gz -O {params.pipeline_path}{output.forward}"
-
-
-rule decompress_fastq:
-    input:
-        r1="resources/{SRA}/{accession}_1.fastq.gz",
-        r2="resources/{SRA}/{accession}_2.fastq.gz",
-    output:
-        r1="resources/{SRA}/{accession}_1.fastq",
-        r2="resources/{SRA}/{accession}_2.fastq",
-    shell:
-        "gunzip -c {input.r1} > {output.r1}"
-        "gunzip -c {input.r2} > {output.r2}"
-
-
-# single_end
-# rule align_reads_se:
-#     input:
-#         fasta="resources/genome.fasta",
-#         reads1="resources/{SRA}/{accession}.fastq",
-#     output:
-#         "resources/{SRA}{accession}/aligned-reads.bam",
-#     conda:
-#         "envs/bwa-mem2.yaml"
-#     log:
-#         "logs/align_reads_{SRA}.log",
-#     shell:
-#         """
-#         bwa-mem2 index {input.fasta}
-#         bwa-mem2 mem -t 8 {input.fasta} {input.reads1} | samtools view -S -b - > {output}
-#         """
-
-
-# # paired end
-rule align_reads_pe:
-    input:
-        fasta="resources/genome.fasta",
-        reads1="resources/{SRA}/{accession}_1.fastq",
-        reads2="resources/{SRA}/{accession}_2.fastq",
-    output:
-        "resources/{SRA}/aligned-reads.bam",
-    conda:
-        "envs/bwa-mem2.yaml"
-    log:
-        "logs/align_reads{SRA}{accession}.log",
-    resources:
-        mem_mb=1024,
-    shell:
-        """
-        bwa-mem2 index {input.fasta}
-        bwa-mem2 mem -t 8 {input.fasta} {input.reads1} {input.reads2} | samtools view -S -b - > {output}
-        """
-
-
-rule sort_aligned_reads:
-    input:
-        "resources/{SRA}/aligned-reads.bam",
-    output:
-        "resources/{SRA}/aligned-reads-sorted.bam",
-    log:
-        "logs/sort_aligned_reads{SRA}.log",
-    conda:
-        "envs/samtools.yaml"
-    params:
-        pipeline_path=config["pipeline_path"],
-    threads: 10
-    shell:
-        """
-        samtools sort -@ {threads}  {input} -o {output}    
-        """
-
-
-rule filter_aligned_reads:
-    input:
-        "resources/{SRA}/aligned-reads-sorted.bam",
-    output:
-        bam="resources/{SRA}/aligned-reads-focused.bam",
-        sam="resources/{SRA}/aligned-reads-focused.sam",
-    log:
-        "logs/filter_aligned_reads{SRA}.log",
-    conda:
-        "envs/samtools.yaml"
-    params:
-        pipeline_path=config["pipeline_path"],
-        chromosome=chromosome_conf["chromosome"],
-    threads: 10
-    shell:
-        """ 
-        samtools index -@ {threads} {params.pipeline_path}{input}
-        samtools view -b -o {output.bam} {input} {params.chromosome}
-        samtools view -h {output.bam} -o {output.sam}
-
-        """
+        expand("results/{SRA}/meth.png", SRA=accession),
+        expand("results/{SRA}/unmeth.png", SRA=accession),
 
 
 rule find_bases:
     input:
-        aligned_reads="resources/{SRA}/aligned-reads-focused.sam",
-        # aligned_reads="resources/aligned-reads.sam",
-        candidates="resources/candidates_filtered_{scatteritem}.vcf",
-        # candidates="resources/candidates.vcf",
+        aligned_reads="resources/{SRA}/candidate_specific/alignment_{scatteritem}.bam",
+        aligned_reads_index="resources/{SRA}/candidate_specific/alignment_{scatteritem}.bam.bai",
+        # aligned_reads="resources/{SRA}/aligned-reads-focused.sam",
+        candidates="resources/candidates_{scatteritem}.vcf",
+        # candidates="resources/candidates_filtered_{scatteritem}.vcf",
     output:
-        "resources/{SRA}/pos_to_bases_{scatteritem}.txt",
+        "results/{SRA}/all_pos_to_base/pos_to_bases_{scatteritem}.txt",
     conda:
         "envs/varlociraptor.yaml"
     params:
@@ -375,56 +50,21 @@ rule find_bases:
 
 rule gather_calls:
     input:
-        gather.split_candidates("resources/{{SRA}}/pos_to_bases_{scatteritem}.txt"),
+        gather.split_candidates(
+            "results/{{SRA}}/all_pos_to_base/pos_to_bases_{scatteritem}.txt"
+        ),
     output:
-        "resources/{SRA}/pos_to_bases.txt",
+        "results/{SRA}/pos_to_bases.txt",
     shell:
         "cat {input} > {output}"
 
 
-rule download_bedGraphs:
-    output:
-        "resources/HG002/{bedGraph}.bedGraph.gz",
-    log:
-        "logs/download_bedGraphs{bedGraph}.log",
-    params:
-        pipeline_path=config["pipeline_path"],
-        bedGraphs=config["bedGraphs_HG002"],
-    script:
-        "scripts/get_bedGraph_data.py"
-
-
-rule process_data:
-    input:
-        "resources/HG002/{bedGraph}.bedGraph.gz",
-    output:
-        "resources/HG002/{bedGraph}.bedGraph",
-    log:
-        "logs/process_data{bedGraph}.log",
-    shell:
-        "gunzip -c {input} > {output}"
-
-
-rule compute_avg_bedGraph:
-    input:
-        # expand("resources/HG002/bedGraph/{bed}.bedGraph", bed=bedGraphs),
-        expand(
-            "resources/HG002/{bedGraph}.bedGraph", bedGraph=config["bedGraphs_HG002"]
-        ),
-    output:
-        "resources/bed_avg.bedGraph",
-    log:
-        "logs/compute_avg_bedGraph.log",
-    script:
-        "scripts/compute_avg_bedGraph.py"
-
-
 rule c_to_t_rates:
     input:
-        ref_bases="resources/{SRA}/pos_to_bases.txt",
+        ref_bases="results/{SRA}/pos_to_bases.txt",
         bedGraph="resources/bed_avg.bedGraph",
     output:
-        rates="resources/{SRA}/c_to_t_rates.png",
+        rates="results/{SRA}/c_to_t_rates.png",
     conda:
         "envs/plot.yaml"
     log:
@@ -435,9 +75,11 @@ rule c_to_t_rates:
 
 rule assign_bases:
     input:
-        bedGraph="resources/bed_avg.bedGraph",
+        bedGraph=expand(
+            "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
+        ),
         # bedGraph="resources/alignments_CpG.bedGraph",
-        ref_bases="resources/{SRA}/pos_to_bases.txt",
+        ref_bases="results/{SRA}/pos_to_bases.txt",
     output:
         "results/{SRA}/assigned_bases.txt",
     conda:
@@ -456,9 +98,12 @@ rule assign_bases:
 
 rule plot_methylation_status:
     input:
-        bedGraph="resources/bed_avg.bedGraph",
+        bedGraph=expand(
+            "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
+        ),
+        # bedGraph="resources/bed_avg.bedGraph",
         # bedGraph="resources/alignments_CpG.bedGraph",
-        ref_bases="resources/{SRA}/pos_to_bases.txt",
+        ref_bases="results/{SRA}/pos_to_bases.txt",
     output:
         unmeth="results/{SRA}/unmeth.png",
         meth="results/{SRA}/meth.png",
