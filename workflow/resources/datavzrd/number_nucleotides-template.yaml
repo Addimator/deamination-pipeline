@@ -1,0 +1,61 @@
+__use_yte__: true
+
+name: ?f"Number of nucleotides for {wildcards.SRA}"
+datasets:
+  comparison_table:
+    path: ?input.table
+    offer-excel: true
+    separator: ","
+default-view: comparison_plot
+views:
+  comparison_table:
+    dataset: comparison_table
+    desc: |
+      Table for values of meta comparison. 
+      The table is sorted in descending order by the pi-value score of the maximum difference in positive and negative total effects of fold changes influenced by the enrichment (as proposed  by `Xiao et al. 2014 <https://dx.doi.org/10.1093/bioinformatics/`).
+    page-size: 25
+    render-table:
+      columns:
+        methylation_status:
+          label: Methylated
+          custom: |
+            function(row) {
+              if (row == 'True') {
+                return '✔';
+              } else {
+                return '✗';
+              }
+            }
+        direction:
+          custom: |
+            function(row) {
+              if (row == 'reverse') {
+                return '🡠';
+              } else {
+                return '🡢';
+              }
+            }
+        A:
+          
+          plot:
+            heatmap:
+          #     scale: linear
+      # add-columns:
+      #   direction:
+      #     value: |
+      #       function(row) {
+      #         const dir = row['direction'];
+      #         if (dir == 'reverse') {
+      #           return '🡠';
+      #         } else {
+      #           return '🡢';
+      #         }
+      #       }
+
+  comparison_plot:
+    dataset: comparison_table
+    desc: |
+      The left side shows the summed positive beta-scores within a GO-term and the right side shows the summed negative beta-scores, with each point representing a GO-term. This illustrates whether a GO-term is enriched positively, negatively, or in both directions.
+      Dealing with the plots: You can drag the plot to centre interesting areas. You can zoom into the plot using the mouse wheel. When you click on a gene, it is also highlighted in the other plot. If the ‘Shift’ key is held down, several genes can be selected at the same time.
+    render-plot:
+      spec-path: ?input.plot

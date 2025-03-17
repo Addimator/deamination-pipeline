@@ -3,6 +3,7 @@ resources/**
 logs/**
 .snakemake
 .snakemake/**
+report.zip
 
 
 

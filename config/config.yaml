@@ -3,18 +3,18 @@ sample:
   datatype: "dna"
   build: "GRCh38"
   release: "110"
-  chromosome: "21"
+  chromosome: "J02459"
 
 candidate: 1
-chromosome: 21
-# varlo_path: "~/Documents/Promotion/deamination-varlo/varlociraptor/"
-# pipeline_path: "~/Documents/Promotion/deamination-pipeline/"
-# deamination_path: "~/Documents/Promotion/deamination/"
+chromosome: J02459
+varlo_path: "~/Documents/Promotion/deamination_stuff/deamination-varlo/varlociraptor/"
+pipeline_path: "~/Documents/Promotion/deamination_stuff/deamination-pipeline/"
+deamination_path: "~/Documents/Promotion/deamination_stuff/deamination/"
 
 
-varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
-pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
-deamination_path: "/projects/koesterlab/benchmark-methylation/deamination/"
+# varlo_path: "/projects/koesterlab/benchmark-methylation/deamination-varlo/varlociraptor/"
+# pipeline_path: "/projects/koesterlab/benchmark-methylation/deamination-pipeline/"
+# deamination_path: "/projects/koesterlab/benchmark-methylation/deamination/"
 
 
 read_type: "Illumina"
@@ -36,7 +36,8 @@ accession:
   # - "SRR1766504"
   # - "SRR1766492"
   # - "SRR1766528"
-  - "HG002_HiSeq30x_subsampled"
+  # - "HG002_HiSeq30x_subsampled"
+  - "debug"
 
 bedGraphs_HG002:
   - GSM5649436_TruSeq_HG002_LAB01_REP02

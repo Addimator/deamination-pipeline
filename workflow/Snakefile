@@ -9,7 +9,7 @@ candidate = config["candidate"]
 
 
 scattergather:
-    split_candidates=20,
+    split_candidates=4,
 
 
 include: "rules/align_reads.smk"
@@ -18,22 +18,28 @@ include: "rules/candidates.smk"
 include: "rules/get_data.smk"
 
 
+report: "report/workflow.rst"
+
+
 rule all:
     input:
-        expand("results/{SRA}/assigned_bases.txt", SRA=accession),
-        expand("results/{SRA}/meth.png", SRA=accession),
-        expand("results/{SRA}/unmeth.png", SRA=accession),
+        # expand("results/{SRA}/number_bases.csv", SRA=accession),
+        # expand("results/{SRA}/ratio_barplot.html", SRA=accession),
+        expand("results/{SRA}/datavzrd-reports/", SRA=accession),
 
 
 rule find_bases:
     input:
+        bedGraph=expand(
+            "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
+        ),
         aligned_reads="resources/{SRA}/candidate_specific/alignment_{scatteritem}.bam",
         aligned_reads_index="resources/{SRA}/candidate_specific/alignment_{scatteritem}.bam.bai",
         # aligned_reads="resources/{SRA}/aligned-reads-focused.sam",
-        candidates="resources/candidates_{scatteritem}.vcf",
+        # candidates="resources/candidates_{scatteritem}.vcf",
         # candidates="resources/candidates_filtered_{scatteritem}.vcf",
     output:
-        "results/{SRA}/all_pos_to_base/pos_to_bases_{scatteritem}.txt",
+        "results/{SRA}/all_pos_to_base/number_bases_{scatteritem}.csv",
     conda:
         "envs/varlociraptor.yaml"
     params:
@@ -44,84 +50,116 @@ rule find_bases:
     shell:
         """
         cd {params.deamination_path}
-        cargo run  -- find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.candidates} {params.pipeline_path}{output}
+        cargo run -- find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{output}
        """
 
 
 rule gather_calls:
     input:
         gather.split_candidates(
-            "results/{{SRA}}/all_pos_to_base/pos_to_bases_{scatteritem}.txt"
+            "results/{{SRA}}/all_pos_to_base/number_bases_{scatteritem}.csv"
         ),
     output:
-        "results/{SRA}/pos_to_bases.txt",
-    shell:
-        "cat {input} > {output}"
-
-
-rule c_to_t_rates:
-    input:
-        ref_bases="results/{SRA}/pos_to_bases.txt",
-        bedGraph="resources/bed_avg.bedGraph",
-    output:
-        rates="results/{SRA}/c_to_t_rates.png",
-    conda:
-        "envs/plot.yaml"
-    log:
-        "logs/c_to_t_rates{SRA}.log",
-    script:
-        "scripts/plot_conversion_rates.py"
-
-
-rule assign_bases:
-    input:
-        bedGraph=expand(
-            "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
-        ),
-        # bedGraph="resources/alignments_CpG.bedGraph",
-        ref_bases="results/{SRA}/pos_to_bases.txt",
-    output:
-        "results/{SRA}/assigned_bases.txt",
-    conda:
-        "envs/varlociraptor.yaml"
-    params:
-        pipeline_path=config["pipeline_path"],
-        deamination_path=config["deamination_path"],
-    log:
-        "logs/assign_bases_{SRA}.log",
+        "results/{SRA}/number_bases_concat.csv",
     shell:
         """
-        cd {params.deamination_path}
-        cargo run  -- assign-bases {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{input.ref_bases} {params.pipeline_path}{output}
+        echo methylation_status,direction,orig_base,A,C,G,T,N > {output}
+        cat {input} >> {output}
         """
 
 
-rule plot_methylation_status:
+rule number_nucleotides:
     input:
-        bedGraph=expand(
-            "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
-        ),
-        # bedGraph="resources/bed_avg.bedGraph",
-        # bedGraph="resources/alignments_CpG.bedGraph",
-        ref_bases="results/{SRA}/pos_to_bases.txt",
+        "results/{SRA}/number_bases_concat.csv",
     output:
-        unmeth="results/{SRA}/unmeth.png",
-        meth="results/{SRA}/meth.png",
+        "results/{SRA}/number_bases.csv",
     conda:
         "envs/plot.yaml"
-    params:
-        pipeline_path=config["pipeline_path"],
-        deamination_path=config["deamination_path"],
     log:
-        "logs/plot_methylation_status{SRA}.log",
+        "logs/number_nucleotides_{SRA}.log",
     script:
-        "scripts/plot_methylation_status.py"
+        "scripts/merge_nucleotides.py"
 
 
-# rule gather_calls:
+rule plot_number_nucleotides:
+    input:
+        "results/{SRA}/number_bases.csv",
+    output:
+        "results/{SRA}/ratio_barplot.json",
+    conda:
+        "envs/plot.yaml"
+    log:
+        "logs/plot_number_nucleotides_{SRA}.log",
+    script:
+        "scripts/barplot.py"
+
+
+# Postprocessing GO Enrichment Data
+# Generating Meta Comparison Datavzrd Reports
+rule number_nucleotides_datavzrd:
+    input:
+        config="workflow/resources/datavzrd/number_nucleotides-template.yaml",
+        table="results/{SRA}/number_bases.csv",
+        plot="results/debug/ratio_barplot.json",
+    output:
+        report(
+            directory("results/{SRA}/datavzrd-reports/"),
+            category=lambda wildcards: f"Datavzrd {wildcards.SRA}",
+        ),
+    # params:
+    # pathway_db=config["enrichment"]["spia"]["pathway_database"],
+    # species=config["resources"]["ref"]["species"],
+    log:
+        "logs/number_nucleotides_datavzrd_{SRA}.log",
+    wrapper:
+        "v5.5.0/utils/datavzrd"
+
+
+# rule assign_bases:
 #     input:
-#         gather.split_candidates("results/pos_to_bases_{scatteritem}.txt")
+#         bedGraph=expand(
+#             "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
+#         ),
+#         # bedGraph="resources/alignments_CpG.bedGraph",
+#         ref_bases="results/{SRA}/pos_to_bases.txt",
 #     output:
-#         "resources/pos_to_bases.txt"
+#         "results/{SRA}/assigned_bases.txt",
+#     conda:
+#         "envs/varlociraptor.yaml"
+#     params:
+#         pipeline_path=config["pipeline_path"],
+#         deamination_path=config["deamination_path"],
+#     log:
+#         "logs/assign_bases_{SRA}.log",
 #     shell:
-#         "cat {input} > {output}"
+#         """
+#         cd {params.deamination_path}
+#         cargo run  -- assign-bases {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{input.ref_bases} {params.pipeline_path}{output}
+#         """
+# rule plot_methylation_status:
+#     input:
+#         bedGraph=expand(
+#             "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
+#         ),
+#         # bedGraph="resources/bed_avg.bedGraph",
+#         # bedGraph="resources/alignments_CpG.bedGraph",
+#         ref_bases="results/{SRA}/pos_to_bases.txt",
+#     output:
+#         unmeth="results/{SRA}/unmeth.png",
+#         meth="results/{SRA}/meth.png",
+#     conda:
+#         "envs/plot.yaml"
+#     params:
+#         pipeline_path=config["pipeline_path"],
+#         deamination_path=config["deamination_path"],
+#     log:
+#         "logs/plot_methylation_status{SRA}.log",
+#     script:
+#         "scripts/plot_methylation_status.py"
+# # rule gather_calls:
+# #     input:
+# #         gather.split_candidates("results/pos_to_bases_{scatteritem}.txt")
+# #     output:
+# #         "resources/pos_to_bases.txt"
+# #     shell:
+# #         "cat {input} > {output}"

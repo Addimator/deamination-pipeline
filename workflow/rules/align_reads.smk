@@ -49,7 +49,7 @@ rule filter_aligned_reads:
         "../envs/samtools.yaml"
     params:
         pipeline_path=config["pipeline_path"],
-        chromosome=chromosome_conf["chromosome"],
+        chromosome=config["chromosome"],
     threads: 10
     shell:
         """ 
@@ -121,10 +121,13 @@ rule aligned_reads_candidates_region:
     shell:
         """
         set +o pipefail;
-        start=$(bcftools query -f '%POS\\n' {input.candidate} | head -n 1)
-        end=$(bcftools query -f '%POS\\n' {input.candidate} | tail -n 1)
+        start=$(bcftools query -f '%POS\n' {input.candidate} | head -n 1)
+        end=$(bcftools query -f '%POS\n' {input.candidate} | tail -n 1)
         end=$((end + {params.window_size}))
-        samtools view -h -b {input.alignment} "{params.chromosome}:$start-$end" > {output}
+        echo {params.chromosome}
+        echo $start
+        echo $end
+        samtools view -b {input.alignment} "{params.chromosome}:$start-$end" > {output}
         """
 
 
