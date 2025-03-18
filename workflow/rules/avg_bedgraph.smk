@@ -1,4 +1,3 @@
-chr_chromosome = "chr" + str(config["chromosome"])
 
 
 rule download_bedGraphs:
@@ -33,7 +32,11 @@ rule filter_bedGraphs:
         chromosome="[^_]+",
     shell:
         """
-        awk '$1 == "{wildcards.chromosome}" {{print}}' {input} > {output}
+        if [ "{wildcards.chromosome}" != "all"]; then
+            awk '$1 == "{wildcards.chromosome}" {{print}}' {input} > {output}
+        else
+            cp {input} {output}
+        fi
         """
 
 

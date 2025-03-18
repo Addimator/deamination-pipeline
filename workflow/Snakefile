@@ -48,7 +48,7 @@ rule find_bases:
     shell:
         """
         cd {params.deamination_path}
-        cargo run -- find-bases {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{output}
+        cargo run  {params.pipeline_path}{input.aligned_reads} {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{output}
        """
 
 
@@ -111,53 +111,3 @@ rule number_nucleotides_datavzrd:
         "logs/number_nucleotides_datavzrd_{SRA}.log",
     wrapper:
         "v5.5.0/utils/datavzrd"
-
-
-# rule assign_bases:
-#     input:
-#         bedGraph=expand(
-#             "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
-#         ),
-#         # bedGraph="resources/alignments_CpG.bedGraph",
-#         ref_bases="results/{SRA}/pos_to_bases.txt",
-#     output:
-#         "results/{SRA}/assigned_bases.txt",
-#     conda:
-#         "envs/varlociraptor.yaml"
-#     params:
-#         pipeline_path=config["pipeline_path"],
-#         deamination_path=config["deamination_path"],
-#     log:
-#         "logs/assign_bases_{SRA}.log",
-#     shell:
-#         """
-#         cd {params.deamination_path}
-#         cargo run  -- assign-bases {params.pipeline_path}{input.bedGraph} {params.pipeline_path}{input.ref_bases} {params.pipeline_path}{output}
-#         """
-# rule plot_methylation_status:
-#     input:
-#         bedGraph=expand(
-#             "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
-#         ),
-#         # bedGraph="resources/bed_avg.bedGraph",
-#         # bedGraph="resources/alignments_CpG.bedGraph",
-#         ref_bases="results/{SRA}/pos_to_bases.txt",
-#     output:
-#         unmeth="results/{SRA}/unmeth.png",
-#         meth="results/{SRA}/meth.png",
-#     conda:
-#         "envs/plot.yaml"
-#     params:
-#         pipeline_path=config["pipeline_path"],
-#         deamination_path=config["deamination_path"],
-#     log:
-#         "logs/plot_methylation_status{SRA}.log",
-#     script:
-#         "scripts/plot_methylation_status.py"
-# # rule gather_calls:
-# #     input:
-# #         gather.split_candidates("results/pos_to_bases_{scatteritem}.txt")
-# #     output:
-# #         "resources/pos_to_bases.txt"
-# #     shell:
-# #         "cat {input} > {output}"

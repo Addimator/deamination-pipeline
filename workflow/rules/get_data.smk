@@ -41,11 +41,15 @@ rule filter_genome:
     conda:
         "../envs/samtools.yaml"
     params:
-        chromosome=config["chromosome"],
+        chromosome=chromosome,
     threads: 10
     shell:
         """ 
-        samtools faidx {input} {params.chromosome} > {output}
+        if [ "{params.chromosome}" != "all" ]; then
+            samtools faidx {input} {params.chromosome} > {output}
+        else
+            cp {input} {output}
+        fi
         """
 
 
@@ -72,14 +76,19 @@ rule filter_giab_annotations:
         consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed",
         mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf",
     params:
-        chromosome="chr" + config["chromosome"],
+        chromosome="chr" + chromosome,
     conda:
         "../envs/samtools.yaml"
     shell:
         """
-        bcftools index -f {input.mutations}
-        bcftools view -r {params.chromosome} {input.mutations} -o {output.mutations}
-        awk '$1 == "{params.chromosome}"' {input.consistent} > {output.consistent}
+        if [ "{params.chromosome}" != "chrall" ]; then
+            bcftools index -f {input.mutations}
+            bcftools view -r {params.chromosome} {input.mutations} -o {output.mutations}
+            awk '$1 == "{params.chromosome}"' {input.consistent} > {output.consistent}
+        else
+            cp {input.mutations} {output.mutations}
+            cp {input.consistent} {output.consistent}
+        fi
         """
 
 
@@ -124,7 +133,7 @@ rule get_pcr_free_data_forward:
     output:
         "resources/{SRA}/{accession}_R1.fastq.gz",
     log:
-        "logs/get_pcr_free_data_forward{SRA}/{accession}.log",
+        "logs/get_pcr_free_data_forward/{SRA}/{accession}.log",
     params:
         pipeline_path=config["pipeline_path"],
     shell:

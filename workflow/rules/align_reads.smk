@@ -42,20 +42,22 @@ rule filter_aligned_reads:
         "resources/{SRA}/aligned-reads-sorted.bam",
     output:
         bam="resources/{SRA}/aligned-reads-focused.bam",
-        sam="resources/{SRA}/aligned-reads-focused.sam",
     log:
         "logs/filter_aligned_reads{SRA}.log",
     conda:
         "../envs/samtools.yaml"
     params:
         pipeline_path=config["pipeline_path"],
-        chromosome=config["chromosome"],
+        chromosome=chromosome,
     threads: 10
     shell:
         """ 
         samtools index -@ {threads} {params.pipeline_path}{input}
-        samtools view -b -o {output.bam} {input} {params.chromosome}
-        samtools view -h {output.bam} -o {output.sam}
+        if [ "{params.chromosome}" != "all" ]; then
+            samtools view -b -o {output.bam} {input} {params.chromosome}
+        else
+            samtools view -b -o {output.bam} {input}
+        fi
         """
 
 
@@ -112,7 +114,7 @@ rule aligned_reads_candidates_region:
         index="resources/{SRA}/aligned-reads-focused_dedup.bam.bai",
         candidate=expand(
             "resources/{chromosome}/bed_avg_{{scatteritem}}_filtered.bedGraph",
-            chromosome=config["chromosome"],
+            chromosome=chromosome,
         ),
         # candidate="resources/bed_avg_{chromosome}_{scatteritem}_filtered.bedGraph",
     output:
@@ -121,16 +123,17 @@ rule aligned_reads_candidates_region:
         "../envs/samtools.yaml"
     params:
         window_size=config["max_read_length"],
-        chromosome=config["chromosome"],
+        chromosome=chromosome,
     shell:
         """
-        set +o pipefail;
+        samtools view -b -L {input.candidate} {input.alignment} > {output}
 
-        start=$(awk 'NR==1 {{print $2}}' {input.candidate})
-        end=$(awk 'END {{print $2}}' {input.candidate})
-        end=$((end + {params.window_size}))
-        samtools view -b {input.alignment} "{params.chromosome}:$start-$end" > {output}
         """
+        # set +o pipefail;
+        # start=$(awk 'NR==1 {{print $2}}' {input.candidate})
+        # end=$(awk 'END {{print $2}}' {input.candidate})
+        # end=$((end + {params.window_size}))
+        # samtools view -b {input.alignment} "{params.chromosome}:$start-$end" > {output}
 
 
 rule aligned_reads_candidates_region_to_sam:
