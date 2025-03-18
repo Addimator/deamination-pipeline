@@ -41,7 +41,7 @@ rule filter_genome:
     conda:
         "../envs/samtools.yaml"
     params:
-        chromosome=chromosome_conf["chromosome"],
+        chromosome=config["chromosome"],
     threads: 10
     shell:
         """ 
@@ -72,12 +72,12 @@ rule filter_giab_annotations:
         consistent="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent_filtered.bed",
         mutations="resources/HG002_GRCh38_1_22_v4.2.1_benchmark_filtered.vcf",
     params:
-        chromosome="chr" + chromosome_conf["chromosome"],
+        chromosome="chr" + config["chromosome"],
     conda:
         "../envs/samtools.yaml"
     shell:
         """
-        bcftools index {input.mutations}
+        bcftools index -f {input.mutations}
         bcftools view -r {params.chromosome} {input.mutations} -o {output.mutations}
         awk '$1 == "{params.chromosome}"' {input.consistent} > {output.consistent}
         """

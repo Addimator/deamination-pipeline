@@ -2,14 +2,14 @@ configfile: "config/config.yaml"
 
 
 accession = config["accession"]
-chromosome_conf = config["sample"]
 genome_config = config["sample"]
 candidate = config["candidate"]
-# chr_chromosomes = "chr" + str(config["chromosome"])
+chr_chromosome = "chr" + str(config["chromosome"])
+chromosome = str(config["chromosome"])
 
 
 scattergather:
-    split_candidates=4,
+    split_candidates=config["num_candidates"],
 
 
 include: "rules/align_reads.smk"
@@ -31,13 +31,11 @@ rule all:
 rule find_bases:
     input:
         bedGraph=expand(
-            "resources/bed_avg_{chromosome}.bedGraph", chromosome=config["chromosome"]
+            "resources/{chromosome}/bed_avg_{{scatteritem}}_filtered.bedGraph",
+            chromosome=chromosome,
         ),
         aligned_reads="resources/{SRA}/candidate_specific/alignment_{scatteritem}.bam",
         aligned_reads_index="resources/{SRA}/candidate_specific/alignment_{scatteritem}.bam.bai",
-        # aligned_reads="resources/{SRA}/aligned-reads-focused.sam",
-        # candidates="resources/candidates_{scatteritem}.vcf",
-        # candidates="resources/candidates_filtered_{scatteritem}.vcf",
     output:
         "results/{SRA}/all_pos_to_base/number_bases_{scatteritem}.csv",
     conda:
@@ -100,7 +98,7 @@ rule number_nucleotides_datavzrd:
     input:
         config="workflow/resources/datavzrd/number_nucleotides-template.yaml",
         table="results/{SRA}/number_bases.csv",
-        plot="results/debug/ratio_barplot.json",
+        plot="results/{SRA}/ratio_barplot.json",
     output:
         report(
             directory("results/{SRA}/datavzrd-reports/"),

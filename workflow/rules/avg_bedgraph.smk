@@ -28,7 +28,7 @@ rule filter_bedGraphs:
     input:
         "resources/HG002/{bedGraph}.bedGraph",
     output:
-        "resources/HG002/{bedGraph}-{chromosome}.bedGraph",
+        "resources/HG002/{chromosome}/{bedGraph}.bedGraph",
     wildcard_constraints:
         chromosome="[^_]+",
     shell:
@@ -40,12 +40,12 @@ rule filter_bedGraphs:
 rule compute_avg_bedGraph:
     input:
         expand(
-            "resources/HG002/{bedGraph}-{chromosome}.bedGraph",
+            "resources/HG002/{chromosome}/{bedGraph}.bedGraph",
             bedGraph=config["bedGraphs_HG002"],
             chromosome=chr_chromosome,
         ),
     output:
-        "resources/bed_avg_{chromosome}.bedGraph",
+        "resources/{chromosome}/bed_avg.bedGraph",
     wildcard_constraints:
         chromosome="[^_]+",
     params:

@@ -35,11 +35,12 @@ views:
                 return '🡢';
               }
             }
-        A:
-          
-          plot:
-            heatmap:
-          #     scale: linear
+        ?for nucleotide in ['A', 'C', 'G', 'T', 'N']:
+          ?nucleotide:
+        # regex('^[ACGTN]$')":   
+            plot:
+              heatmap:
+                type: quantitative
       # add-columns:
       #   direction:
       #     value: |

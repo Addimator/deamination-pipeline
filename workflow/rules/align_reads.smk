@@ -110,23 +110,25 @@ rule aligned_reads_candidates_region:
     input:
         alignment="resources/{SRA}/aligned-reads-focused_dedup.bam",
         index="resources/{SRA}/aligned-reads-focused_dedup.bam.bai",
-        candidate="resources/candidates_{scatteritem}.bcf",
+        candidate=expand(
+            "resources/{chromosome}/bed_avg_{{scatteritem}}_filtered.bedGraph",
+            chromosome=config["chromosome"],
+        ),
+        # candidate="resources/bed_avg_{chromosome}_{scatteritem}_filtered.bedGraph",
     output:
         "resources/{SRA}/candidate_specific/alignment_{scatteritem}.bam",
     conda:
         "../envs/samtools.yaml"
     params:
         window_size=config["max_read_length"],
-        chromosome=chromosome_conf["chromosome"],
+        chromosome=config["chromosome"],
     shell:
         """
         set +o pipefail;
-        start=$(bcftools query -f '%POS\n' {input.candidate} | head -n 1)
-        end=$(bcftools query -f '%POS\n' {input.candidate} | tail -n 1)
+
+        start=$(awk 'NR==1 {{print $2}}' {input.candidate})
+        end=$(awk 'END {{print $2}}' {input.candidate})
         end=$((end + {params.window_size}))
-        echo {params.chromosome}
-        echo $start
-        echo $end
         samtools view -b {input.alignment} "{params.chromosome}:$start-$end" > {output}
         """
 
